@@ -9,14 +9,13 @@
   <link rel="icon" href="favicon.ico" sizes="32x32">
   <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="vendor/leaflet.css"><link rel="stylesheet" href="styles.css?v=20261013.4">
+  <link rel="stylesheet" href="vendor/leaflet.css"><link rel="stylesheet" href="styles.css?v=20261013.5"><link rel="stylesheet" href="breadcrumbs.css?v=20261013.1">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to study content</a>
   <div class="app-shell" id="app">
     <header class="topbar">
-      <a class="book-back" href="./" aria-label="Back to Book of Mormon books"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></a>
-      <p class="book-title" id="bookTitle"></p>
+      <nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="../">Wayfinder</a></li><li><a href="./">Book of Mormon</a></li><li id="bookCrumb" hidden></li></ol></nav>
       <div class="settings-menu" id="settingsMenu">
         <button id="settingsButton" class="settings-button" aria-label="Open menu" aria-expanded="false" aria-controls="settingsPanel"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
         <section id="settingsPanel" class="settings-panel" aria-labelledby="settingsHeading" hidden>
@@ -64,7 +63,7 @@
     } else {
       const appScript = document.createElement('script');
       appScript.type = 'module';
-      appScript.src = 'app.js?v=20261013.4';
+      appScript.src = 'app.js?v=20261013.5';
       document.body.append(appScript);
     }
   </script>

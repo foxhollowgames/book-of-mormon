@@ -330,11 +330,6 @@ dialog[open]::backdrop{opacity:1}
 @media(max-width:400px){.topbar{gap:4px}.topbar .brand{gap:6px}.topbar .compass{width:30px;height:30px}.topbar .segmented button{padding:7px 8px}.topbar .settings-button{width:32px}}
 
 /* The book header shows a back arrow and the book title. */
-.book-back{display:grid;place-items:center;flex:none;width:44px;height:44px;margin:0 -6px 0 -8px;color:var(--ink);border-radius:7px}
-.book-back:hover{color:#56dcff}
-.book-back:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
-.book-title{margin:0;min-width:0;color:#fff;font:700 24px/1.1 var(--serif);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media(max-width:400px){.book-title{font-size:19px;letter-spacing:1px}}
 
 /* Relative geography and evidence levels specific to this app. */
 .layer-swatch.guess{background:transparent!important;border:1.5px dashed #d5aa57}

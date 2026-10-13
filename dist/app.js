@@ -4,6 +4,7 @@
 import { initModalDragging } from './modal-drag.js?v=20261013.4';
 import { initChapterPicker } from './chapter-picker.js?v=20261013.4';
 import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261013.4';
+import { initBookCrumb } from './breadcrumbs.js?v=20261013.1';
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const releaseVersion = '20261013.4';
@@ -108,6 +109,13 @@ function buildStaticUi() {
   $('#scriptureAttribution').textContent = `${scripture.translation || 'The Book of Mormon'} · ${scripture.copyright || 'Public-domain text file'}`;
   $('#layerOptions').innerHTML = [['places', 'Places', 'place'], ['guesses', 'Rough guesses', 'guess'], ['zones', 'Terrain zones', 'region'], ['paths', 'Paths', 'route'], ['distances', 'Sorenson’s distances', 'distance']]
     .map(([key, label, kind]) => `<label class="layer-option"><input type="checkbox" data-layer="${key}"><span class="layer-swatch ${kind}"></span>${label}</label>`).join('');
+  // A book in the crumb list opens in this reader.
+  $('#bookCrumb').addEventListener('click', e => {
+    const link = e.target.closest('.crumb-menu a');
+    if (!link) return;
+    e.preventDefault();
+    selectChapter(new URLSearchParams(link.hash.slice(1)).get('chapter'));
+  });
   document.addEventListener('click', onClick);
   document.addEventListener('change', onChange);
   $('#libraryDialog .dialog-close').addEventListener('click', () => hideModalPanel($('#libraryDialog')));
@@ -264,8 +272,13 @@ function renderScripture() {
   const heading = `<div class="scripture-heading"><button class="sidebar-next" data-action="chapter-prev" aria-label="Previous chapter" ${i === 0 ? 'disabled' : ''}>‹</button><div class="chapter-picker-block"><h1 class="chapter-picker"><button type="button" class="chapter-picker-trigger" aria-label="${many ? `Choose ${esc(info.book)} chapter, current chapter ${n}` : `${esc(info.book)} ${n}, the only chapter`}" aria-haspopup="listbox" aria-expanded="false" aria-controls="chapterPickerMenu" ${many ? '' : 'disabled'}>${esc(info.label)}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg></button></h1></div><div id="chapterPickerMenu" class="chapter-picker-menu" popover="auto" role="listbox" aria-label="Choose ${esc(info.book)} chapter">${nums.map(c => `<button type="button" role="option" aria-label="${esc(info.book)} chapter ${c}" aria-selected="${c === n}" tabindex="-1" data-value="${c}"><span>${c}</span><span class="chapter-picker-check" aria-hidden="true">${c === n ? '✓' : ''}</span></button>`).join('')}</div><button class="sidebar-next" data-action="chapter-next" aria-label="Next chapter" ${i === book.chapters.length - 1 ? 'disabled' : ''}>›</button></div>`;
   $('#sidebarContent').innerHTML = heading + chapterIntroHtml(cm) + info.verses.map(v => verseHtml(v, cm)).join('');
   if (many) initChapterPicker($('#sidebarContent'), n, nums, c => selectChapter(book.chapters[nums.indexOf(c)]));
-  // The header names the open book, as in Bible Wayfinder.
-  $('#bookTitle').textContent = info.book;
+  // The last crumb names the open book and lists the other books.
+  const crumb = $('#bookCrumb');
+  if (crumb.dataset.book !== info.book) {
+    const books = scripture.books.map(b => ({ name: b.book, url: `#chapter=${b.chapters[0]}&verse=1` }));
+    initBookCrumb(crumb, books, books.find(b => b.name === info.book));
+    crumb.dataset.book = info.book;
+  }
   document.title = `${info.label} · Book of Mormon Wayfinder`;
 }
 function selectStudyMode(mode) {
