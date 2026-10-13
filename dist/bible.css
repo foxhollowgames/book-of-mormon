@@ -43,3 +43,6 @@
 @media(max-width:650px){.bible-header{flex-wrap:nowrap;padding:10px 18px}}
 @media(prefers-reduced-motion:reduce){.settings-button{transition:none}}
 .cover-credits{margin:30px 0 0;color:var(--muted);font:12px/1.6 var(--sans);overflow-wrap:anywhere}.cover-credits span{display:block}
+
+/* Link from a volume home page to the Wayfinder hub. */
+.hub-link{display:inline-block;margin-bottom:18px;color:var(--muted);text-decoration:none;font:11px/1.6 var(--sans);letter-spacing:2px}.hub-link:hover{color:var(--cyan)}
