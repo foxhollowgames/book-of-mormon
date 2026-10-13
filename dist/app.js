@@ -7,7 +7,7 @@ import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v
 import { initBookCrumb } from './breadcrumbs.js?v=20261013.1';
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-const releaseVersion = '20261013.4';
+const releaseVersion = '20261013.6';
 const storeKey = 'bom-wayfinder-state';
 const defaults = { chapter: 'alma-22', verse: 27, lens: 'sorenson', studyMode: 'read', layers: { places: true, zones: false, paths: true, distances: false, guesses: true }, map: null };
 let saved = readSaved();
@@ -447,10 +447,6 @@ function drawBase() {
   for (let y = -300; y <= 400; y += 50) L.polyline([[y, -420], [y, 260]], { pane: 'grid', color: '#ffffff', weight: .5, opacity: .05, interactive: false }).addTo(layers.grid);
   for (const label of g.labels) L.marker(ll(label.at), { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: `geo-label geo-${label.kind}`, html: `<span>${esc(label.text)}</span>`, iconSize: [0, 0] }) }).addTo(map);
   L.marker(ll([-2, 30]), { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: 'geo-label geo-river', html: '<span>river Sidon</span>', iconSize: [0, 0] }) }).addTo(map);
-  layers.areaLabels = L.layerGroup().addTo(map);
-  layers.dynamic = L.layerGroup().addTo(map);
-  layers.arrows = L.layerGroup().addTo(map);
-  layers.labels = L.layerGroup().addTo(map);
 }
 function bind(layer, item, type) {
   layer.on('click', e => openFeature(item, type, e.target));
@@ -486,49 +482,99 @@ function focusIds() {
   guideOverlay?.placeIds.forEach(id => ids.add(id));
   return ids;
 }
+const mapFeatures = new Map(), arrowFeatures = new Map(), labelFeatures = new Map(), areaFeatures = new Map();
+const reducedMapMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const mapTransitionMs = 650;
+// Retain each feature by identity. Interrupted fades resume from their current opacity.
+function fadeMapFeature(entry, visible, done) {
+  const el = entry.layer.getElement();
+  const opacity = entry.animation ? getComputedStyle(el).opacity : (entry.visible ? '1' : '0');
+  entry.animation?.cancel();
+  entry.visible = visible;
+  el.style.opacity = visible ? '1' : '0';
+  el.style.pointerEvents = visible ? '' : 'none';
+  if (el.hasAttribute('tabindex')) el.setAttribute('tabindex', visible ? '0' : '-1');
+  el.setAttribute('aria-hidden', String(!visible));
+  if (reducedMapMotion.matches || !el.animate) { entry.animation = null; done?.(); return; }
+  const animation = el.animate([{ opacity }, { opacity: visible ? 1 : 0 }], { duration: visible ? mapTransitionMs : 350, easing: 'ease-in-out' });
+  entry.animation = animation;
+  animation.onfinish = () => { entry.animation = null; done?.(); };
+}
+function keepMapFeature(collection, key, create) {
+  let entry = collection.get(key);
+  if (!entry) {
+    entry = { layer: create(), visible: false, animation: null };
+    collection.set(key, entry);
+  }
+  if (!entry.visible) fadeMapFeature(entry, true);
+  return entry.layer;
+}
+function retireMapFeatures(collection, wanted) {
+  for (const [key, entry] of collection) {
+    if (wanted.has(key) || !entry.visible) continue;
+    fadeMapFeature(entry, false, () => { map.removeLayer(entry.layer); collection.delete(key); });
+  }
+}
+reducedMapMotion.addEventListener('change', () => {
+  if (!reducedMapMotion.matches) return;
+  for (const collection of [mapFeatures, arrowFeatures, labelFeatures, areaFeatures]) {
+    for (const entry of collection.values()) entry.animation?.finish();
+  }
+  $$('.route-arrow svg').forEach(el => el.getAnimations().forEach(animation => animation.finish()));
+});
 function drawAreaLabels() {
   if (!map) return;
-  layers.areaLabels.clearLayers();
+  const wanted = new Set();
   const cm = chapterMap();
   for (const a of data.areas) {
     const named = !!cm?.areaMentions?.[a.id];
     if (!named && map.getZoom() < 1) continue;
-    L.marker(ll(a.at), { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: `geo-label geo-area ${named ? 'named' : ''}`, html: `<span>${esc(a.name)}</span>`, iconSize: [0, 0] }) }).addTo(layers.areaLabels);
+    wanted.add(a.id);
+    const label = keepMapFeature(areaFeatures, a.id, () => L.marker(ll(a.at), { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: 'geo-label geo-area', html: `<span>${esc(a.name)}</span>`, iconSize: [0, 0] }) }).addTo(map));
+    label.getElement().classList.toggle('named', named);
   }
+  retireMapFeatures(areaFeatures, wanted);
 }
 function drawOverlays() {
   if (!map) return;
-  layers.dynamic.clearLayers();
+  const wanted = new Set();
+  const feature = (key, create, item, type) => {
+    wanted.add(key);
+    return keepMapFeature(mapFeatures, key, () => {
+      const layer = create().addTo(map);
+      if (item) bind(layer, item, type);
+      return layer;
+    });
+  };
   map[state.layers.zones ? 'addLayer' : 'removeLayer'](layers.terrain);
   const focus = focusIds(), cm = chapterMap();
   drawAreaLabels();
   for (const d of activeDistances()) {
     const a = pointOf(d.from), b = pointOf(d.to);
     if (!a || !b) continue;
-    const line = L.polyline([ll(a), ll(b)], { pane: 'distances', color: '#fff3c4', weight: 2, opacity: .85, dashArray: '2 6', className: 'distance-line' }).addTo(layers.dynamic);
-    bind(line, d, 'distance');
-    L.marker(ll([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), { pane: 'distances', interactive: false, keyboard: false, icon: L.divIcon({ className: 'distance-label', html: `<span>${esc(d.label)}</span>`, iconSize: [0, 0] }) }).addTo(layers.dynamic);
+    feature(`distance:${d.id}`, () => L.polyline([ll(a), ll(b)], { pane: 'distances', color: '#fff3c4', weight: 2, opacity: .85, dashArray: '2 6', className: 'distance-line' }), d, 'distance');
+    feature(`distance-label:${d.id}`, () => L.marker(ll([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), { pane: 'distances', interactive: false, keyboard: false, icon: L.divIcon({ className: 'distance-label', html: `<span>${esc(d.label)}</span>`, iconSize: [0, 0] }) }));
   }
   if (state.layers.paths || guideOverlay) for (const r of activeRoutes()) {
     const pts = r.points.map(pointOf).filter(Boolean).map(ll), s = styleFor(r);
-    L.polyline(pts, { pane: 'routes', color: '#071a2a', weight: 7, opacity: .35, interactive: false, smoothFactor: 1 }).addTo(layers.dynamic);
-    L.polyline(pts, { pane: 'routes', color: s.color, weight: 4, opacity: 1, dashArray: s.dash, interactive: false, className: 'route-line' }).addTo(layers.dynamic);
-    const hit = L.polyline(pts, { pane: 'routes', color: s.color, weight: 20, opacity: 0, className: 'route-hit' }).addTo(layers.dynamic);
-    bind(hit, r, 'route');
+    feature(`route-shadow:${r.id}`, () => L.polyline(pts, { pane: 'routes', color: '#071a2a', weight: 7, opacity: .35, interactive: false, smoothFactor: 1 }));
+    feature(`route:${r.id}`, () => L.polyline(pts, { pane: 'routes', color: s.color, weight: 4, opacity: 1, dashArray: s.dash, interactive: false, className: 'route-line' }));
+    feature(`route-hit:${r.id}`, () => L.polyline(pts, { pane: 'routes', color: s.color, weight: 20, opacity: 0, className: 'route-hit' }), r, 'route');
   }
   for (const i of cm?.impacts || []) {
     const p = place(i.place);
     // The stroke stays above place labels. Its empty center keeps the place clickable.
-    const ring = L.circleMarker(ll(p.at), { pane: 'impacts', radius: 13, color: '#e0503f', weight: 3.5, fill: false, className: 'impact-ring' }).addTo(layers.dynamic);
-    bind(ring, { ...p, id: `impact:${p.id}`, impact: i }, 'impact');
+    feature(`impact:${cm.chapter}:${p.id}`, () => L.circleMarker(ll(p.at), { pane: 'impacts', radius: 13, color: '#e0503f', weight: 3.5, fill: false, className: 'impact-ring' }), { ...p, id: `impact:${p.id}`, impact: i }, 'impact');
   }
   if (state.layers.places) for (const p of data.places) {
     if (p.conf === 'guess' && !state.layers.guesses && !focus.has(p.id)) continue;
     const on = focus.has(p.id);
-    const marker = L.circleMarker(ll(p.at), { pane: 'places', radius: on ? 6.5 : 4, color: on ? '#fff4dc' : '#c9d6cf', weight: on ? 2.5 : 1.25, fillColor: on ? '#0877c4' : '#3b4a3a', fillOpacity: p.conf === 'guess' ? .35 : 1, dashArray: p.conf === 'guess' ? '2 3' : null, className: `place-dot conf-${p.conf}` }).addTo(layers.dynamic);
+    const marker = feature(`place:${p.id}`, () => L.circleMarker(ll(p.at), { pane: 'places', radius: 4, fillOpacity: p.conf === 'guess' ? .35 : 1, dashArray: p.conf === 'guess' ? '2 3' : null, className: `place-dot conf-${p.conf}` }), p, 'place');
     marker._placeId = p.id;
-    bind(marker, p, 'place');
+    marker.setRadius(on ? 6.5 : 4);
+    marker.setStyle({ color: on ? '#fff4dc' : '#c9d6cf', weight: on ? 2.5 : 1.25, fillColor: on ? '#0877c4' : '#3b4a3a' });
   }
+  retireMapFeatures(mapFeatures, wanted);
   drawArrows();
   layoutLabels();
   renderLegend();
@@ -536,9 +582,8 @@ function drawOverlays() {
 }
 function drawArrows() {
   if (!map) return;
-  layers.arrows.clearLayers();
-  if (!(state.layers.paths || guideOverlay)) return;
-  for (const r of activeRoutes()) {
+  const wanted = new Set();
+  if (state.layers.paths || guideOverlay) for (const r of activeRoutes()) {
     const pts = r.points.map(pointOf).filter(Boolean).map(p => map.latLngToLayerPoint(ll(p)));
     for (let i = 1; i < pts.length; i++) {
       const a = pts[i - 1], b = pts[i], dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
@@ -548,15 +593,28 @@ function drawArrows() {
         const t = (j + .6) / count;
         const at = map.layerPointToLatLng([a.x + dx * t, a.y + dy * t]);
         const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        L.marker(at, { pane: 'routes', interactive: false, keyboard: false, icon: L.divIcon({ className: 'route-arrow', iconSize: [18, 18], iconAnchor: [9, 9], html: `<svg viewBox="0 0 18 18" aria-hidden="true" style="transform:rotate(${angle}deg)"><path d="M3 3 L14 9 L3 15 L6 9 Z" fill="${styleFor(r).color}" stroke="#fff0d5" stroke-width="1.2"/></svg>` }) }).addTo(layers.arrows);
+        const key = `${r.id}:${i}:${j}`;
+        wanted.add(key);
+        const entering = !arrowFeatures.has(key);
+        const arrow = keepMapFeature(arrowFeatures, key, () => L.marker(at, { pane: 'routes', interactive: false, keyboard: false, icon: L.divIcon({ className: 'route-arrow', iconSize: [18, 18], iconAnchor: [9, 9], html: `<svg viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3 L14 9 L3 15 L6 9 Z" fill="${styleFor(r).color}" stroke="#fff0d5" stroke-width="1.2"/></svg>` }) }).addTo(map));
+        arrow.setLatLng(at);
+        const svg = arrow.getElement().firstElementChild;
+        svg.style.transform = `rotate(${angle}deg)`;
+        if (entering && !reducedMapMotion.matches && svg.animate) {
+          svg.animate([
+            { opacity: 0, transform: `rotate(${angle}deg) translateX(-24px)` },
+            { opacity: 1, transform: `rotate(${angle}deg) translateX(0)` }
+          ], { duration: 650, delay: 300 * (i - 1 + t) / (pts.length - 1), fill: 'backwards', easing: 'cubic-bezier(.22,.61,.36,1)' });
+        }
       }
     }
   }
+  retireMapFeatures(arrowFeatures, wanted);
 }
 function layoutLabels() {
   if (!map) return;
-  layers.labels.clearLayers();
-  if (!state.layers.places) return;
+  const wanted = new Set();
+  if (!state.layers.places) { retireMapFeatures(labelFeatures, wanted); return; }
   const focus = focusIds(), size = map.getSize(), zoom = map.getZoom();
   const occupied = [];
   const stage = map.getContainer().getBoundingClientRect();
@@ -576,11 +634,25 @@ function layoutLabels() {
     const fit = options.find(offset => { const r = target(offset); return r.x > 2 && r.y > 2 && r.x + r.w < size.x - 2 && r.y + r.h < size.y - 2 && !hits(r, p.id); });
     if (!fit) continue;
     occupied.push(target(fit));
-    const label = L.marker(ll(p.at), { pane: 'places', keyboard: false, icon: L.divIcon({ className: `map-text city-label ${on ? 'relevant-label' : 'context-label'} conf-${p.conf}`, html: `<span style="margin-left:${fit[0] < 0 ? 0 : 22}px">${esc(p.name)}</span>`, iconSize: [w + 22, h], iconAnchor: [fit[0] < 0 ? w + 11 : 11, h / 2] }) }).addTo(layers.labels);
-    bind(label, p, 'place');
-    label._placeId = p.id;
+    wanted.add(p.id);
+    const label = keepMapFeature(labelFeatures, p.id, () => {
+      const layer = L.marker(ll(p.at), { pane: 'places', keyboard: false, icon: L.divIcon({ className: `map-text city-label conf-${p.conf}`, html: `<span>${esc(p.name)}</span>`, iconSize: [0, 0] }) }).addTo(map);
+      bind(layer, p, 'place');
+      layer._placeId = p.id;
+      return layer;
+    });
+    // A retained label takes its new side and size here.
+    const el = label.getElement();
+    el.classList.toggle('relevant-label', on);
+    el.classList.toggle('context-label', !on);
+    el.style.width = `${w + 22}px`;
+    el.style.height = `${h}px`;
+    el.style.marginLeft = `${-(fit[0] < 0 ? w + 11 : 11)}px`;
+    el.style.marginTop = `${-h / 2}px`;
+    el.firstElementChild.style.marginLeft = `${fit[0] < 0 ? 0 : 22}px`;
   }
   measure.remove();
+  retireMapFeatures(labelFeatures, wanted);
 }
 function renderLegend() {
   const kinds = [...new Set(activeRoutes().map(r => r.kind))];
@@ -590,19 +662,19 @@ function renderLegend() {
 }
 function syncSelection() {
   const key = $('#contextCard').classList.contains('hidden') ? '' : $('#contextCard').dataset.feature;
-  for (const group of [layers.dynamic, layers.labels]) group?.eachLayer(l => {
-    if (!l._placeId) return;
+  for (const { layer: l } of [...mapFeatures.values(), ...labelFeatures.values()]) {
+    if (!l._placeId) continue;
     const on = key === `place:${l._placeId}`;
     l.getElement()?.classList.toggle('selected-place', on);
     l.getElement()?.setAttribute('aria-pressed', String(on));
-  });
+  }
 }
 function boundsFor(points, pad = .18) { return L.latLngBounds(points.map(ll)).pad(pad); }
 function fitOptions(animate = true) {
   const size = map.getSize(), panel = $('.layers').getBoundingClientRect();
   const drawer = $('#tourDrawer'), right = !drawer.classList.contains('hidden') && size.x > 760 ? drawer.offsetWidth + 30 : 40;
-  if (size.x < 720) return { paddingTopLeft: [24, panel.height + 24], paddingBottomRight: [24, 90], maxZoom: 1.5, animate: animate && !matchMedia('(prefers-reduced-motion: reduce)').matches };
-  return { paddingTopLeft: [Math.min(panel.width + 30, size.x * .45), 40], paddingBottomRight: [Math.min(right, size.x * .4), 40], maxZoom: 1.5, animate: animate && !matchMedia('(prefers-reduced-motion: reduce)').matches };
+  if (size.x < 720) return { paddingTopLeft: [24, panel.height + 24], paddingBottomRight: [24, 90], maxZoom: 1.5, animate: animate && !reducedMapMotion.matches, duration: .8 };
+  return { paddingTopLeft: [Math.min(panel.width + 30, size.x * .45), 40], paddingBottomRight: [Math.min(right, size.x * .4), 40], maxZoom: 1.5, animate: animate && !reducedMapMotion.matches, duration: .8 };
 }
 let lastFit = {};
 // Each stage has its own bounds. The map jumps between stages without a long pan across empty sea.
@@ -616,7 +688,7 @@ function setStage(id) {
   document.body.classList.toggle('old-world-stage', id === 'old');
   return true;
 }
-function fitPoints(points, animate = true) { if (!map || !points.length) return; map.invalidateSize({ pan: false }); const moved = setStage(stageOfPoint(points[0])); if (moved) animate = false; const bounds = points.length === 1 ? boundsFor([[points[0][0] - 25, points[0][1] - 25], [points[0][0] + 25, points[0][1] + 25]], 0) : boundsFor(points); lastFit = { bounds, options: fitOptions(animate) }; map.fitBounds(bounds, lastFit.options); if (moved) { map.setMaxBounds(data.stages[stageId].bounds); map.fire('zoomlevelschange'); } }
+function fitPoints(points, animate = true) { if (!map || !points.length) return; map.invalidateSize({ pan: false }); const moved = setStage(stageOfPoint(points[0])); if (moved) animate = false; const bounds = points.length === 1 ? boundsFor([[points[0][0] - 25, points[0][1] - 25], [points[0][0] + 25, points[0][1] + 25]], 0) : boundsFor(points); lastFit = { bounds, options: fitOptions(animate) }; map.stop(); map.fitBounds(bounds, lastFit.options); if (moved) { map.setMaxBounds(data.stages[stageId].bounds); map.fire('zoomlevelschange'); } }
 function fitWholeMap(animate = true) {
   if (chapterMap()?.oldWorld && data.stages?.old) { const [[south, west], [north, east]] = data.stages.old.bounds; return fitPoints([[west + 300, south + 150], [east - 150, north - 50]], animate); }
   fitPoints(data.geography.land.filter(([, y]) => y < 345 && y > -240), animate);

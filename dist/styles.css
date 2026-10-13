@@ -371,3 +371,5 @@ path.terrain-shape:hover{fill-opacity:.22;stroke-opacity:1}
 .map-stage,#map{background:#0a2f4f}
 /* One extra pixel hides the hairline gaps between relief tiles at fractional zoom. */
 .relief-tiles .leaflet-tile{width:513px!important;height:513px!important;mix-blend-mode:normal!important}
+/* Leaflet sets a marker z-index from its pixel row, and the path layer has z-index 200. Keep these markers above the lines in their pane. */
+.route-arrow,.distance-label{z-index:300!important}
