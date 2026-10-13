@@ -2,7 +2,12 @@
 // Run after prepare-scripture.mjs: node scripts/build-content.mjs
 import { smoothCourse } from './organic-shapes.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
-import * as geo from './geography.mjs';
+import * as newWorld from './geography.mjs';
+import * as oldWorld from './old-world.mjs';
+
+// Mormon's map and the Old World stage of 1 Nephi share one list of places, areas, and paths.
+const geo = { ...newWorld, places: [...oldWorld.places, ...newWorld.places], areas: [...oldWorld.areas, ...newWorld.areas],
+  routes: [...oldWorld.routes, ...newWorld.routes], labels: [...newWorld.labels, ...oldWorld.labels] };
 
 const scripture = JSON.parse(await readFile(new URL('../dist/data/scripture.json', import.meta.url)));
 const chapterIds = scripture.books.flatMap(b => b.chapters);
@@ -49,7 +54,8 @@ const sources = [
     license: 'The data file is in the public domain.' },
   { id: 'leaflet', title: 'Leaflet', author: 'Volodymyr Agafonkin and contributors', year: 2023, type: 'Map software',
     url: 'https://leafletjs.com/', summary: 'Leaflet draws the map. This app uses a flat grid of miles, not a globe.',
-    limitations: 'The software does not add facts to the map.', license: 'BSD 2-Clause license. See dist/vendor/leaflet-LICENSE.txt.' }
+    limitations: 'The software does not add facts to the map.', license: 'BSD 2-Clause license. See dist/vendor/leaflet-LICENSE.txt.' },
+  ...oldWorld.sources
 ];
 
 // ---------- Chapter mentions ----------
@@ -79,11 +85,9 @@ const chapterMaps = chapterIds.map(chapter => {
   const impacts = geo.impacts[chapter] || [];
   // Route endpoints join the chapter focus even when the chapter does not name them.
   const routePlaces = geo.routes.filter(r => routes.includes(r.id)).flatMap(r => r.points.filter(p => typeof p === 'string'));
-  const focus = [...new Set([...Object.keys(placeMentions), ...routePlaces, ...impacts.map(i => i.place)])];
-  const book = bookOf(chapter);
-  const oldWorld = book === '1 Nephi' && Number(scripture.chapters[chapter].chapter) <= 17;
+  const focus = [...new Set([...Object.keys(placeMentions), ...routePlaces, ...impacts.map(i => i.place), ...(oldWorld.focus[chapter] || [])])];
   return { chapter, ...chapterCopy.get(chapter), contextNote: contextNotes[chapter] || null,
-    placeMentions, areaMentions, routes, impacts, focusPlaceIds: focus, oldWorld,
+    placeMentions, areaMentions, routes, impacts, focusPlaceIds: focus, oldWorld: oldWorld.isOldWorldChapter(chapter),
     figures: geo.figures.filter(f => f.chapter === chapter).map(f => f.n) };
 });
 
@@ -109,6 +113,7 @@ const guides = [
 
 const content = {
   sources, chapterMaps, guides,
+  stages: { new: { id: 'new', bounds: [[-330, -420], [420, 260]] }, old: oldWorld.stage },
   geography: { land: geo.land, terrain: geo.terrain, waters: geo.waters, sidon: smoothCourse(geo.sidonCourse), labels: geo.labels },
   places: geo.places.map(({ chapters, books, notBooks, ...rest }) => rest),
   areas: geo.areas.map(({ chapters, books, notBooks, ...rest }) => rest),

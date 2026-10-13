@@ -355,6 +355,7 @@ dialog[open]::backdrop{opacity:1}
 .label-measure{position:absolute;visibility:hidden;left:-9999px;top:0;display:block;width:max-content;padding:4px 7px;border:1px solid transparent;font:12px/18px var(--sans)}
 .label-measure.on{font-weight:700;font-size:13px}
 path.terrain-shape:hover{fill-opacity:.22;stroke-opacity:1}
+#map:not(.old-world) .old-world-credit,body:not(.old-world-stage) .old-world-note,body.old-world-stage .new-world-note{display:none}
 .mile-scale{color:#d2edf6;background:#052640cc;border:1px solid #6d8992;border-radius:4px;padding:3px 7px;font:11px var(--sans)}
 .mile-scale span{display:block;height:5px;border:1.5px solid #d2edf6;border-top:0;margin-bottom:3px}
 .zoomed-out .geo-land,.zoomed-out .geo-unknown,.zoomed-out .geo-area:not(.named),.zoomed-out .geo-river{display:none}

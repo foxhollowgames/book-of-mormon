@@ -3,7 +3,7 @@
 <script>
   // Earlier links opened the reader at this address with a chapter in the hash. Send them to the reader.
   if (/(?:^#|&)chapter=/.test(location.hash)) location.replace('book.html' + location.hash);
-</script><link rel="icon" href="favicon.ico" sizes="32x32"><link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any"><link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180"><link rel="stylesheet" href="bible.css?v=20261013.2"><link rel="stylesheet" href="directory.css?v=20261013.2"></head>
+</script><link rel="icon" href="favicon.ico" sizes="32x32"><link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any"><link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180"><link rel="stylesheet" href="bible.css?v=20261013.4"><link rel="stylesheet" href="directory.css?v=20261013.4"></head>
 <body class="directory-page"><a class="skip" href="#main">Skip to books</a><header class="bible-header"><a class="bible-brand" href="./">BOOK OF MORMON <span>WAYFINDER · MORMON’S MAP</span></a>
   <div class="settings-menu" id="settingsMenu">
     <button id="settingsButton" class="settings-button" aria-label="Open menu" aria-expanded="false" aria-controls="settingsPanel"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
@@ -14,5 +14,5 @@
       <fieldset><legend>Study lens</legend><div class="segmented perspective"><button type="button" data-lens="text" aria-pressed="false">Text only</button><button type="button" data-lens="sorenson" class="active" aria-pressed="true">Text + Sorenson</button></div></fieldset>
     </section>
   </div></header>
-<main id="main" class="directory-main"><div class="directory-intro"><p class="eyebrow">SCRIPTURE · PEOPLE · PLACES</p><h1>Choose a book.</h1><p class="directory-note">The map is relative. It follows the text and John L. Sorenson’s <i>Mormon’s Map</i>. It is not placed on any real land.</p></div>
-<p id="directoryStatus" role="status" class="muted" hidden></p><div id="bookGroups"></div></main><script type="module" src="books.js?v=20261013.2"></script></body></html>
+<main id="main" class="directory-main"><div class="directory-intro"><p class="eyebrow">SCRIPTURE · PEOPLE · PLACES</p><h1>Choose a book.</h1><p class="directory-note">This map is based on John L. Sorenson’s <i>Mormon’s Map</i>. Think of it as a stage for the stories of the Book of Mormon, not a location on any real land.</p></div>
+<p id="directoryStatus" role="status" class="muted" hidden></p><div id="bookGroups"></div></main><script type="module" src="books.js?v=20261013.4"></script></body></html>

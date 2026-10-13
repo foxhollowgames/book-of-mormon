@@ -9,7 +9,7 @@
   <link rel="icon" href="favicon.ico" sizes="32x32">
   <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-  <link rel="stylesheet" href="vendor/leaflet.css"><link rel="stylesheet" href="styles.css?v=20261013.2">
+  <link rel="stylesheet" href="vendor/leaflet.css"><link rel="stylesheet" href="styles.css?v=20261013.4">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to study content</a>
@@ -45,7 +45,7 @@
         </section>
       </section>
     </main>
-    <footer class="site-footer">This is a relative map of the text. It is not placed on any real land. <span aria-hidden="true">·</span> Positions and miles follow John L. Sorenson’s estimates in <i>Mormon’s Map</i> (2000). <span aria-hidden="true">·</span> <span id="scriptureAttribution">The Book of Mormon · Public-domain text file</span></footer>
+    <footer class="site-footer"><span class="new-world-note">This is a relative map of the text. It is not placed on any real land. <span aria-hidden="true">·</span> Positions and miles follow John L. Sorenson’s estimates in <i>Mormon’s Map</i> (2000).</span><span class="old-world-note">This map shows real land from Jerusalem to Arabia. <span aria-hidden="true">·</span> Jerusalem is a known place. The camps after it are proposed sites.</span> <span aria-hidden="true">·</span> <span id="scriptureAttribution">The Book of Mormon · Public-domain text file</span></footer>
     <div id="toast" role="status" class="toast hidden"></div>
     <dialog id="libraryDialog"><button class="dialog-close" aria-label="Close source library">×</button><div id="libraryContent"></div></dialog>
     <dialog id="sourceDialog" aria-labelledby="sourceDialogTitle"><button class="dialog-close" aria-label="Close source details">×</button><div id="sourceContent"></div></dialog>
@@ -64,7 +64,7 @@
     } else {
       const appScript = document.createElement('script');
       appScript.type = 'module';
-      appScript.src = 'app.js?v=20261013.2';
+      appScript.src = 'app.js?v=20261013.4';
       document.body.append(appScript);
     }
   </script>

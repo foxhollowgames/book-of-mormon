@@ -39,6 +39,25 @@ The ring's stroke sits above labels. Its empty center preserves access to the pl
 Context cards use the shared title, kind, body, verse references, and source list.
 The shared `modal-drag.js` adds the drag handle.
 
+## The Old World stage (1 Nephi 1–17)
+
+1 Nephi 1–17 happens before the family reaches the promised land. For those chapters the map shows **real land** from Jerusalem to the coast of Oman. 1 Nephi 18 jumps to Mormon's map for the landing.
+
+- The stage sits on the same flat grid of miles, far east of Mormon's map (Jerusalem is at `[3000, 0]`). The app changes the map bounds when a chapter changes stage.
+- `scripts/old-world.mjs` holds the 6 places, 5 paths, sea labels, and sources. Positions are given in latitude and longitude.
+- Jerusalem is a *known place*. The Red Sea borders, the valley of Lemuel, Nahom, and Bountiful are *proposed sites*. Shazer is a *rough guess*. Each card names the researcher.
+- The relief uses measured elevation, as Bible Wayfinder does. `scripts/fetch-old-world-terrain.mjs` downloads 504 Mapzen terrarium tiles (about 40 MB) into the git-ignored `scripts/terrain-old-world/`. `scripts/render-old-world.py` shades them with the same recipe as `render-relief.py` and writes `dist/assets/relief-old/`, `dist/assets/relief-old.jpg`, and `dist/data/relief-old.json`.
+- The coast, the Dead Sea, the Sea of Galilee, and the great rivers come from the Natural Earth files that Bible Wayfinder uses. Clipped copies are in `scripts/source/old-world-*.geojson`.
+
+Rebuild the stage after editing `scripts/old-world.mjs`:
+
+```text
+npm run build
+node scripts/fetch-old-world-terrain.mjs   # only the first time
+python scripts/render-old-world.py          # about 1 minute; fails if a place lands in water
+npm run check
+```
+
 ## Menu
 
 **Read** shows the scripture beside the map. **Map** gives the whole screen to the map. **Recenter** appears at the top of the map after you move or zoom it.
@@ -94,7 +113,7 @@ Sorenson's chapter 6 links the hourglass shape to Middle America. This app delib
 - Terrain uses blended height fields and irregular ridges. The Sidon valley cuts through the southern highlands.
 - A soft shelf surrounds the coast. The olive, ochre, pale-peak, and blue-water colors remain.
 - The renderer traces the largest streams of its erosion model into `dist/data/relief.json`. The app draws them as thin, unnamed rivers. The text names only the Sidon, and the streams join its drawn course.
-- Seed `1830` keeps the relief stable. Cache version `20261013.2` loads the changed assets.
+- Seed `1830` keeps the relief stable. Cache version `20261013.4` loads the changed assets.
 
 ## Verification limits
 

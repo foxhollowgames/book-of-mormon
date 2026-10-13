@@ -1,11 +1,12 @@
 // Book of Mormon Wayfinder. Built on the Isaiah Study Guide app shell.
 // The map uses Leaflet's flat CRS. One map unit is one of Sorenson's estimated miles.
-import { initModalDragging } from './modal-drag.js?v=20261013.2';
-import { initChapterPicker } from './chapter-picker.js?v=20261013.2';
-import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261013.2';
+// 1 Nephi 1–17 uses a second stage on the same grid: real land from Jerusalem to Arabia, far east of Mormon's map.
+import { initModalDragging } from './modal-drag.js?v=20261013.4';
+import { initChapterPicker } from './chapter-picker.js?v=20261013.4';
+import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261013.4';
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-const releaseVersion = '20261013.2';
+const releaseVersion = '20261013.4';
 const storeKey = 'bom-wayfinder-state';
 const defaults = { chapter: 'alma-22', verse: 27, lens: 'sorenson', studyMode: 'read', layers: { places: true, zones: false, paths: true, distances: false, guesses: true }, map: null };
 let saved = readSaved();
@@ -13,13 +14,15 @@ let saved = readSaved();
 let state = { ...defaults, ...saved, ...readPreferences(), layers: { ...defaults.layers, ...(saved.layers || {}) } };
 let data = { sources: [], chapterMaps: [], guides: [], places: [], areas: [], routes: [], distances: [], figures: [], geography: {} };
 let scripture = { books: [], chapters: {} };
-let map, chapterIds = [], toastTimer, guideState = null, guideOverlay = null, mapHome = null;
+let map, chapterIds = [], toastTimer, guideState = null, guideOverlay = null, mapHome = null, stageId = 'new';
 
 const kindLabels = { city: 'City', land: 'Land', hill: 'Hill', water: 'Water', wilderness: 'Wilderness', pass: 'Pass', feature: 'Feature', place: 'Place', region: 'Area' };
 const confidence = {
   text: { label: 'Text gives its relations', note: 'The text links this place to others. Sorenson’s figures set the spot.' },
   inferred: { label: 'Sorenson’s inference', note: 'The text gives hints. Sorenson works out the spot from them.' },
-  guess: { label: 'Rough guess', note: 'The text gives almost no position. This spot is only a placeholder.' }
+  guess: { label: 'Rough guess', note: 'The text gives almost no position. This spot is only a placeholder.' },
+  known: { label: 'Known place', note: 'This place is known today. The map shows its real position.' },
+  proposed: { label: 'Proposed site', note: 'The text gives direction and travel time. Researchers propose this site.' }
 };
 const movementStyles = {
   military: { label: 'Army', color: '#e0503f', dash: '9 5' },
@@ -79,10 +82,11 @@ function sorensonCite(pages) {
 
 async function load() {
   parseUrl();
-  const results = await Promise.allSettled(['data/content.json', 'data/scripture.json', 'data/relief.json'].map(p => fetch(`${p}?v=${releaseVersion}`).then(r => { if (!r.ok) throw Error(`${p} (${r.status})`); return r.json(); })));
+  const results = await Promise.allSettled(['data/content.json', 'data/scripture.json', 'data/relief.json', 'data/relief-old.json'].map(p => fetch(`${p}?v=${releaseVersion}`).then(r => { if (!r.ok) throw Error(`${p} (${r.status})`); return r.json(); })));
   if (results[0].status === 'fulfilled') data = { ...data, ...results[0].value };
   if (results[1].status === 'fulfilled') scripture = results[1].value;
   if (results[2].status === 'fulfilled') data.relief = results[2].value;
+  if (results[3].status === 'fulfilled') data.reliefOld = results[3].value;
   chapterIds = scripture.books.flatMap(b => b.chapters);
   if (!chapterIds.includes(state.chapter)) state.chapter = defaults.chapter;
   if (!chapterInfo()?.verses.some(v => v.verse === state.verse)) state.verse = 1;
@@ -248,7 +252,7 @@ function mapContextHtml(cm) {
   const named = Object.keys(cm?.placeMentions || {}).map(place).filter(Boolean);
   const areas = Object.keys(cm?.areaMentions || {}).map(id => data.areas.find(a => a.id === id)).filter(Boolean);
   const empty = !cm?.focusPlaceIds.length ? '<p>This chapter has no mapped places.</p>' : '';
-  const scope = cm?.oldWorld ? 'This chapter takes place outside these mapped lands.' : 'The map shows relative positions. The text does not give exact locations.';
+  const scope = cm?.oldWorld ? 'This map shows real land. Jerusalem is a known place. The camps after it are proposed sites.' : 'The map shows relative positions. The text does not give exact locations.';
   const chips = named.length ? `<p class="place-chips">${named.map(p => `<button type="button" class="place-chip conf-${p.conf}" data-place-id="${esc(p.id)}">${esc(p.name)}</button>`).join('')}</p>` : '';
   return `${empty}<details><summary>Map context</summary><p>${scope}</p>${chips}${areas.length ? `<p>${areas.map(a => esc(a.name)).join(' · ')}</p>` : ''}</details>`;
 }
@@ -327,6 +331,14 @@ function sorensonHtml(s) {
   if (!sorensonOn() || !s) return '';
   return `<div class="word-section"><h3>Sorenson’s reading</h3><p>${esc(s.text)} ${sorensonCite(s.pages)}</p></div>`;
 }
+// Old World places and paths cite the researcher who proposed them.
+function researchHtml(r, title) {
+  if (!sorensonOn() || !r) return '';
+  const s = source(r.sourceId);
+  const cite = s ? ` <a class="source-inline-citation" href="${esc(s.url)}" data-source-id="${esc(s.id)}" aria-haspopup="dialog">${esc(s.author)}, ${s.year}</a>` : '';
+  return `<div class="word-section"><h3>${title}</h3><p>${esc(r.text)}${cite}</p></div>`;
+}
+const cardSources = item => !sorensonOn() ? ['bom-text'] : item.stage === 'old' ? ['bom-text', item.research?.sourceId].filter(Boolean) : ['bom-text', 'sorenson-2000'];
 function placeCardHtml(p) {
   const cm = chapterMap();
   const verses = cm?.placeMentions?.[p.id] || [];
@@ -334,12 +346,12 @@ function placeCardHtml(p) {
   const conf = confidence[p.conf];
   const here = verses.length ? `<div class="word-section"><h3>In ${esc(chapterInfo().label)}</h3>${verseQuote(state.chapter, verses[0])}${verses.length > 1 ? `<p class="muted">Also in verses ${verses.slice(1).map(v => refButton(`${chapterInfo().label}:${v}`)).join(', ')}.</p>` : ''}</div>` : '';
   const loss = impact ? `<div class="word-section impact-section"><h3>Destruction</h3><p>${esc(impact.text)} ${refButton(impact.ref)}</p></div>` : '';
-  return `<span class="eyebrow">${esc(kindLabels[p.kind] || 'Place')}</span><h2>${esc(p.name)}</h2><span class="badge conf-badge conf-${p.conf}" title="${esc(conf.note)}">${esc(conf.label)}</span><div class="feature-prose"><p>${esc(p.summary)}</p></div>${loss}${here}<div class="feature-prose">${refsHtml(p.refs)}</div>${sorensonHtml(p.sorenson)}${sourcesHtml(sorensonOn() ? ['bom-text', 'sorenson-2000'] : ['bom-text'])}<p class="card-footnote">${esc(conf.note)}</p>`;
+  return `<span class="eyebrow">${esc(kindLabels[p.kind] || 'Place')}</span><h2>${esc(p.name)}</h2><span class="badge conf-badge conf-${p.conf}" title="${esc(conf.note)}">${esc(conf.label)}</span><div class="feature-prose"><p>${esc(p.summary)}</p></div>${loss}${here}<div class="feature-prose">${refsHtml(p.refs)}</div>${sorensonHtml(p.sorenson)}${researchHtml(p.research, 'Proposed site')}${sourcesHtml(cardSources(p))}<p class="card-footnote">${esc(conf.note)}</p>`;
 }
 function routeCardHtml(r) {
   const stops = r.points.filter(x => typeof x === 'string').map(id => `<button type="button" class="place-chip" data-place-id="${esc(id)}">${esc(place(id)?.name)}</button>`).join('');
   const refs = r.refs.split(/;\s*/).map(refButton).join('; ');
-  return `<span class="eyebrow" style="color:${styleFor(r).color}">${esc(styleFor(r).label)}</span><h2>${esc(r.title)}</h2><div class="feature-prose"><p>${esc(r.text)}</p><p>${refs}</p></div><div class="word-section"><h3>Named stops</h3><p>${stops || '<span class="muted">The text names no stops.</span>'}</p></div>${sorensonHtml(r.sorenson)}${sourcesHtml(sorensonOn() ? ['bom-text', 'sorenson-2000'] : ['bom-text'])}<p class="card-footnote">Bends between stops are drawn for reading only. The text gives the stops, not the road.</p>`;
+  return `<span class="eyebrow" style="color:${styleFor(r).color}">${esc(styleFor(r).label)}</span><h2>${esc(r.title)}</h2><div class="feature-prose"><p>${esc(r.text)}</p><p>${refs}</p></div><div class="word-section"><h3>Named stops</h3><p>${stops || '<span class="muted">The text names no stops.</span>'}</p></div>${sorensonHtml(r.sorenson)}${researchHtml(r.research, 'Proposed route')}${sourcesHtml(cardSources(r))}<p class="card-footnote">Bends between stops are drawn for reading only. The text gives the stops, not the road.</p>`;
 }
 function distanceCardHtml(d) {
   return `<span class="eyebrow">Sorenson’s distance</span><h2>${esc(d.label)}</h2><div class="feature-prose"><p>${esc(d.text)} ${sorensonCite(d.pages)}</p></div>${sourcesHtml(['sorenson-2000'])}<p class="card-footnote">Sorenson says his miles could be off by about a quarter.</p>`;
@@ -376,12 +388,13 @@ function initMap() {
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   map.attributionControl.setPrefix(false);
   map.attributionControl.addAttribution('Relative map after J. L. Sorenson, <i>Mormon’s Map</i> (2000) · <a href="https://leafletjs.com">Leaflet</a>');
+  if (data.reliefOld?.attribution) map.attributionControl.addAttribution(`<span class="old-world-credit">${esc(data.reliefOld.attribution)}</span>`);
   for (const [name, z] of [['sea', 150], ['land', 200], ['terrain', 230], ['water', 260], ['grid', 270], ['labels', 280], ['distances', 395], ['routes', 410], ['places', 420], ['impacts', 430]]) {
     map.createPane(name); map.getPane(name).style.zIndex = z;
     map.getPane(name).classList.add('wayfinder-pane');
   }
   for (const name of ['sea', 'land', 'water', 'grid', 'labels']) map.getPane(name).style.pointerEvents = 'none';
-  new (L.Control.extend({ options: { position: 'bottomleft' }, onAdd() { const el = L.DomUtil.create('div', 'mile-scale'); this._el = el; map.on('zoomend', () => this.update()); this.update(); return el; }, update() { const pxPerMile = Math.pow(2, map.getZoom()); const miles = [10, 25, 50, 100].find(m => m * pxPerMile >= 70) || 100; this._el.innerHTML = `<span style="width:${Math.round(miles * pxPerMile)}px"></span>${miles} miles · Sorenson’s estimate`; } }))().addTo(map);
+  new (L.Control.extend({ options: { position: 'bottomleft' }, onAdd() { const el = L.DomUtil.create('div', 'mile-scale'); this._el = el; map.on('zoomend moveend', () => this.update()); this.update(); return el; }, update() { const pxPerMile = Math.pow(2, map.getZoom()); const miles = [10, 25, 50, 100, 250, 500].find(m => m * pxPerMile >= 70) || 500; this._el.innerHTML = `<span style="width:${Math.round(miles * pxPerMile)}px"></span>${miles} miles${stageId === 'old' ? '' : ' · Sorenson’s estimate'}`; } }))().addTo(map);
   map.setView([30, -20], 0, { animate: false });
   drawBase();
   const zoomClass = () => map.getContainer().classList.toggle('zoomed-out', map.getZoom() < 0);
@@ -404,6 +417,13 @@ function drawBase() {
     const mountain = t.level === 'mountain';
     const shape = L.polygon(t.points.map(ll), { pane: 'terrain', color: mountain ? '#3b2a17' : '#fff1c9', weight: 1.5, opacity: .75, dashArray: '5 6', fillColor: mountain ? '#3b2a17' : '#fff1c9', fillOpacity: .08, smoothFactor: 2, className: 'terrain-shape' }).addTo(layers.terrain);
     bind(shape, t, 'terrain');
+  }
+  // The Old World stage for 1 Nephi 1–17: measured relief rendered by scripts/render-old-world.py.
+  if (data.reliefOld?.tiles) {
+    const [[south, west], [north, east]] = data.reliefOld.bounds;
+    L.rectangle([[south - 400, west - 400], [north + 400, east + 400]], { pane: 'sea', stroke: false, fillColor: '#0a2f4f', fillOpacity: 1, interactive: false }).addTo(map);
+    L.tileLayer(`${data.reliefOld.tiles.url}?v=${releaseVersion}`, { pane: 'land', className: 'relief-tiles', tileSize: data.reliefOld.tiles.size, minNativeZoom: data.reliefOld.tiles.minZoom, maxNativeZoom: data.reliefOld.tiles.maxZoom, minZoom: -3, maxZoom: 3, bounds: data.reliefOld.bounds, keepBuffer: 3 }).addTo(map);
+    for (const river of data.reliefOld.rivers || []) L.polyline(river.points.map(ll), { pane: 'water', color: '#4b9fbd', weight: river.size > 1 ? 2.2 : 1.4, opacity: .85, smoothFactor: 1, interactive: false }).addTo(map);
   }
   // Unnamed rivers traced from the relief's valleys by scripts/render-relief.py. The text names only the Sidon.
   for (const river of data.relief?.rivers || []) L.polyline(river.points.map(ll), { pane: 'water', color: '#4b9fbd', weight: river.size > 1 ? 2.2 : 1.4, opacity: .85, smoothFactor: 1, interactive: false }).addTo(map);
@@ -552,7 +572,8 @@ function layoutLabels() {
 function renderLegend() {
   const kinds = [...new Set(activeRoutes().map(r => r.kind))];
   const cm = chapterMap();
-  $('.map-note').innerHTML = `<div class="movement-legend">${(state.layers.paths || guideOverlay) ? kinds.map(k => `<span><i style="background:${movementStyles[k].color}"></i>${movementStyles[k].label}</span>`).join('') : ''}${cm?.impacts?.length ? '<span><i class="impact-key"></i>Destroyed city</span>' : ''}</div>${mapContextHtml(cm)}<div class="conf-key"><span><i class="dot text"></i>Text gives relations</span><span><i class="dot guess"></i>Rough guess</span></div>`;
+  const confKey = cm?.oldWorld ? '<span><i class="dot text"></i>Known or proposed site</span>' : '<span><i class="dot text"></i>Text gives relations</span>';
+  $('.map-note').innerHTML = `<div class="movement-legend">${(state.layers.paths || guideOverlay) ? kinds.map(k => `<span><i style="background:${movementStyles[k].color}"></i>${movementStyles[k].label}</span>`).join('') : ''}${cm?.impacts?.length ? '<span><i class="impact-key"></i>Destroyed city</span>' : ''}</div>${mapContextHtml(cm)}<div class="conf-key">${confKey}<span><i class="dot guess"></i>Rough guess</span></div>`;
 }
 function syncSelection() {
   const key = $('#contextCard').classList.contains('hidden') ? '' : $('#contextCard').dataset.feature;
@@ -571,8 +592,22 @@ function fitOptions(animate = true) {
   return { paddingTopLeft: [Math.min(panel.width + 30, size.x * .45), 40], paddingBottomRight: [Math.min(right, size.x * .4), 40], maxZoom: 1.5, animate: animate && !matchMedia('(prefers-reduced-motion: reduce)').matches };
 }
 let lastFit = {};
-function fitPoints(points, animate = true) { if (!map || !points.length) return; map.invalidateSize({ pan: false }); const bounds = points.length === 1 ? boundsFor([[points[0][0] - 25, points[0][1] - 25], [points[0][0] + 25, points[0][1] + 25]], 0) : boundsFor(points); lastFit = { bounds, options: fitOptions(animate) }; map.fitBounds(bounds, lastFit.options); }
-function fitWholeMap(animate = true) { fitPoints(data.geography.land.filter(([, y]) => y < 345 && y > -240), animate); }
+// Each stage has its own bounds. The map jumps between stages without a long pan across empty sea.
+const stageOfPoint = at => data.stages?.old && at[0] >= data.stages.old.bounds[0][1] ? 'old' : 'new';
+function setStage(id) {
+  if (id === stageId || !data.stages?.[id]) return false;
+  stageId = id;
+  map.setMaxBounds(null);
+  map.options.minZoom = id === 'old' ? -2.5 : -1.5;
+  map.getContainer().classList.toggle('old-world', id === 'old');
+  document.body.classList.toggle('old-world-stage', id === 'old');
+  return true;
+}
+function fitPoints(points, animate = true) { if (!map || !points.length) return; map.invalidateSize({ pan: false }); const moved = setStage(stageOfPoint(points[0])); if (moved) animate = false; const bounds = points.length === 1 ? boundsFor([[points[0][0] - 25, points[0][1] - 25], [points[0][0] + 25, points[0][1] + 25]], 0) : boundsFor(points); lastFit = { bounds, options: fitOptions(animate) }; map.fitBounds(bounds, lastFit.options); if (moved) { map.setMaxBounds(data.stages[stageId].bounds); map.fire('zoomlevelschange'); } }
+function fitWholeMap(animate = true) {
+  if (chapterMap()?.oldWorld && data.stages?.old) { const [[south, west], [north, east]] = data.stages.old.bounds; return fitPoints([[west + 300, south + 150], [east - 150, north - 50]], animate); }
+  fitPoints(data.geography.land.filter(([, y]) => y < 345 && y > -240), animate);
+}
 function focusChapterMap(animate = true) {
   if (!map) return;
   const cm = chapterMap();
@@ -645,7 +680,7 @@ function openSource(id) {
 }
 function openLibrary() {
   const counts = data.places.reduce((n, p) => (n[p.conf] = (n[p.conf] || 0) + 1, n), {});
-  $('#libraryContent').innerHTML = `<h2>Source library</h2><section><h3>How this map is built</h3><p>The map is drawn on a flat grid of miles. It is not tied to any real place on earth.</p><p>Each spot follows Sorenson’s figures and his travel-day estimates. When his figures disagree, his written mile estimates decide.</p><p>${counts.text || 0} places have relations given in the text. ${counts.inferred || 0} follow Sorenson’s reasoning. ${counts.guess || 0} are rough guesses.</p><p>Paths show the stops the text names. Bends between stops only help reading.</p></section>${data.sources.map(librarySourceHtml).join('')}`;
+  $('#libraryContent').innerHTML = `<h2>Source library</h2><section><h3>How this map is built</h3><p>The map is drawn on a flat grid of miles. It is not tied to any real place on earth.</p><p>Each spot follows Sorenson’s figures and his travel-day estimates. When his figures disagree, his written mile estimates decide.</p><p>${counts.text || 0} places have relations given in the text. ${counts.inferred || 0} follow Sorenson’s reasoning. ${counts.guess || 0} are rough guesses.</p><p>Paths show the stops the text names. Bends between stops only help reading.</p><p>For 1 Nephi 1–17 the map shows real land from Jerusalem to Arabia. Jerusalem is a known place. The camps after it are proposed sites.</p></section>${data.sources.map(librarySourceHtml).join('')}`;
   openStudyModal('libraryDialog');
   $('#libraryDialog').scrollTop = 0;
 }

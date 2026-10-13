@@ -1,5 +1,5 @@
 // Book of Mormon directory, built on the Bible Wayfinder directory.
-import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261013.2';
+import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261013.4';
 
 // The menu sets how each book opens. The reader uses the same choices.
 const menu = document.querySelector('#settingsMenu');
@@ -28,10 +28,9 @@ const groupsOf = [
 ];
 const groups = document.querySelector('#bookGroups'), status = document.querySelector('#directoryStatus');
 try {
-  const [scripture, content, relief] = await Promise.all(['data/scripture.json', 'data/content.json', 'data/relief.json']
-    .map(path => fetch(`${path}?v=20261013.2`).then(r => { if (!r.ok) throw new Error(path); return r.json(); })));
+  const [scripture, content, relief, reliefOld] = await Promise.all(['data/scripture.json', 'data/content.json', 'data/relief.json', 'data/relief-old.json']
+    .map(path => fetch(`${path}?v=20261013.4`).then(r => { if (!r.ok) throw new Error(path); return r.json(); })));
   const places = new Map(content.places.map(p => [p.id, p]));
-  const [[y0, x0], [y1, x1]] = relief.bounds;
   for (const [title, names] of groupsOf) {
     const section = document.createElement('section'), heading = document.createElement('h2'), grid = document.createElement('div');
     heading.textContent = title; grid.className = 'book-grid'; section.append(heading, grid);
@@ -40,8 +39,13 @@ try {
       if (!book) continue;
       const maps = content.chapterMaps.filter(c => book.chapters.includes(c.chapter));
       const ids = new Set(maps.flatMap(c => c.focusPlaceIds));
-      const points = [...ids].map(id => places.get(id)?.at).filter(Boolean);
+      // 1 Nephi happens mostly in the Old World, so its card shows that relief.
+      const found = [...ids].map(id => places.get(id)).filter(Boolean);
+      const old = found.filter(p => p.stage === 'old').length > found.length / 2;
+      const points = found.filter(p => (p.stage === 'old') === old).map(p => p.at);
+      const [[y0, x0], [y1, x1]] = (old ? reliefOld : relief).bounds;
       const card = document.createElement('a');
+      if (old) card.style.setProperty('--map-image', `url("${reliefOld.image}?v=20261013.4")`);
       card.className = 'book-card ready has-map';
       card.href = `book.html#chapter=${book.chapters[0]}&verse=1`;
       // Each card shows the part of the relief map where its book's places sit.
@@ -49,7 +53,7 @@ try {
       const cy = points.length ? points.reduce((n, p) => n + p[1], 0) / points.length : 50;
       card.style.setProperty('--map-x', `${((cx - x0) / (x1 - x0) * 100).toFixed(1)}%`);
       card.style.setProperty('--map-y', `${((y1 - cy) / (y1 - y0) * 100).toFixed(1)}%`);
-      card.style.setProperty('--map-size', points.length ? '420%' : '190%');
+      card.style.setProperty('--map-size', old ? '260%' : points.length ? '420%' : '190%');
       const label = document.createElement('p');
       label.textContent = `${book.chapters.length} ${book.chapters.length === 1 ? 'chapter' : 'chapters'} · ${ids.size ? `${ids.size} ${ids.size === 1 ? 'place' : 'places'} on the map` : 'No places on the map'}`;
       const h3 = document.createElement('h3'); h3.textContent = name;

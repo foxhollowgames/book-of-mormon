@@ -1,6 +1,9 @@
 // Validates references, IDs, positions, and prose rules. Run: node scripts/check.mjs
 import { readFile } from 'node:fs/promises';
-import * as geo from './geography.mjs';
+import * as newWorld from './geography.mjs';
+import * as oldWorld from './old-world.mjs';
+
+const geo = { ...newWorld, places: [...oldWorld.places, ...newWorld.places], routes: [...oldWorld.routes, ...newWorld.routes] };
 
 const scripture = JSON.parse(await readFile(new URL('../dist/data/scripture.json', import.meta.url)));
 const content = JSON.parse(await readFile(new URL('../dist/data/content.json', import.meta.url)));
@@ -62,7 +65,15 @@ function inside([x, y], poly) {
   }
   return hit;
 }
-for (const place of geo.places) if (!inside(place.at, geo.land)) errors.push(`${place.id} is outside the land outline`);
+// Old World places sit on real land. render-old-world.py checks them against the real coast.
+for (const place of newWorld.places) if (!inside(place.at, geo.land)) errors.push(`${place.id} is outside the land outline`);
+const [[south, west], [north, east]] = oldWorld.stage.bounds;
+for (const place of oldWorld.places) if (place.at[0] <= west || place.at[0] >= east || place.at[1] <= south || place.at[1] >= north) errors.push(`${place.id} is outside the Old World map`);
+for (const chapter of content.chapterMaps) {
+  const stages = new Set(chapter.focusPlaceIds.map(id => geo.places.find(p => p.id === id)?.stage || 'new'));
+  if (stages.size > 1) errors.push(`${chapter.chapter} mixes Old World and New World places`);
+  if (chapter.oldWorld && !stages.has('old')) errors.push(`${chapter.chapter} has no Old World place to show`);
+}
 // Preserve the relations corrected from Alma 43:32 and Alma 50:14.
 const manti = geo.places.find(p => p.id === 'manti');
 const sidonAtManti = geo.sidonCourse.find(([, y]) => y === manti.at[1]);
@@ -81,8 +92,8 @@ function prose(text, path) {
     if (words.length > 15) errors.push(`${path}: sentence has ${words.length} words`);
   }
 }
-for (const p of geo.places) { prose(p.summary, `${p.id}.summary`); prose(p.sorenson.text, `${p.id}.sorenson`); p.refs.forEach((r, i) => prose(r.note, `${p.id}.refs[${i}]`)); }
-for (const r of geo.routes) { prose(r.text, `${r.id}.text`); prose(r.sorenson.text, `${r.id}.sorenson`); }
+for (const p of geo.places) { prose(p.summary, `${p.id}.summary`); prose(p.sorenson?.text, `${p.id}.sorenson`); prose(p.research?.text, `${p.id}.research`); p.refs.forEach((r, i) => prose(r.note, `${p.id}.refs[${i}]`)); }
+for (const r of geo.routes) { prose(r.text, `${r.id}.text`); prose(r.sorenson?.text, `${r.id}.sorenson`); prose(r.research?.text, `${r.id}.research`); }
 for (const t of geo.terrain) { prose(t.summary, `${t.id}.summary`); prose(t.sorenson, `${t.id}.sorenson`); }
 for (const d of geo.distances) prose(d.text, `${d.id}.text`);
 for (const g of content.guides) { prose(g.description, `${g.id}.description`); g.steps.forEach((s, i) => prose(s.text, `${g.id}.steps[${i}]`)); }

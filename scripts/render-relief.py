@@ -384,6 +384,6 @@ for zoom in range(top + 1):
     'rivers': rivers
 }, separators=(',', ':')))
 content = json.loads((root / 'dist/data/content.json').read_text(encoding='utf-8'))
-wet = [p['id'] for p in content['places'] if land_hi[int((Y1 - p['at'][1]) * PX), int((p['at'][0] - X0) * PX)] < .5]
+wet = [p['id'] for p in content['places'] if p.get('stage') != 'old' and land_hi[int((Y1 - p['at'][1]) * PX), int((p['at'][0] - X0) * PX)] < .5]
 if wet: raise SystemExit('Places fall in water on the relief: ' + ', '.join(wet))
 print(f'Rendered {W}x{H} relief ({count} tiles) and {len(rivers)} rivers for x {X0}..{X1}, y {Y0}..{Y1} miles.')
