@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#04192d"><meta name="color-scheme" content="dark">
+  <meta name="description" content="Study the Book of Mormon on a relative map built from the text and John L. Sorenson’s Mormon’s Map.">
+  <meta name="robots" content="noindex">
+  <title>Book of Mormon Wayfinder</title>
+  <link rel="icon" href="favicon.ico" sizes="32x32">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" sizes="any">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+  <link rel="stylesheet" href="vendor/leaflet.css"><link rel="stylesheet" href="styles.css?v=20261013.2">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to study content</a>
+  <div class="app-shell" id="app">
+    <header class="topbar">
+      <a class="book-back" href="./" aria-label="Back to Book of Mormon books"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></a>
+      <p class="book-title" id="bookTitle"></p>
+      <div class="settings-menu" id="settingsMenu">
+        <button id="settingsButton" class="settings-button" aria-label="Open menu" aria-expanded="false" aria-controls="settingsPanel"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <section id="settingsPanel" class="settings-panel" aria-labelledby="settingsHeading" hidden>
+          <h2 id="settingsHeading">Menu</h2>
+          <fieldset><legend>Study mode</legend><div class="segmented study-mode"><button type="button" data-study-mode="read" class="active" aria-pressed="true" aria-controls="scriptureSidebar">Read</button><button type="button" data-study-mode="map" aria-pressed="false" aria-controls="mapView">Map</button></div></fieldset>
+          <fieldset><legend>Study lens</legend><div class="segmented perspective"><button type="button" data-lens="text" aria-pressed="false">Text only</button><button type="button" data-lens="sorenson" class="active" aria-pressed="true">Text + Sorenson</button></div></fieldset>
+          <p id="lensHelp">Text only shows what the Book of Mormon says. Text + Sorenson adds his distances and reasons.</p>
+          <button id="guidesButton" class="source-details-button" type="button">Open study guides</button>
+          <button id="libraryButton" class="source-details-button" type="button">Open source library</button>
+        </section>
+      </div>
+    </header>
+    <main id="main">
+      <section class="map-view view active" id="mapView" aria-label="Map study">
+        <aside class="scripture-sidebar" id="scriptureSidebar"><div id="sidebarContent" class="sidebar-content"></div>
+        <div id="scriptureResize" class="scripture-resize" role="separator" tabindex="0" aria-label="Resize scripture panel" aria-controls="scriptureSidebar" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="720" aria-valuenow="432"></div>
+        </aside>
+        <section class="map-workspace">
+          <div class="map-stage"><div id="map" aria-label="Relative map of Book of Mormon lands"></div>
+            <aside class="layers panel" aria-label="Map layers"><button class="layer-heading" id="layerToggle" aria-expanded="true" aria-controls="layerOptions">Map layers <svg class="layer-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></button><div id="layerOptions"></div><div class="map-note"></div></aside>
+            <button class="map-recenter" id="recenterMap" data-action="focus-chapter" hidden>Recenter</button>
+            <section class="context-card panel hidden" id="contextCard" aria-live="polite"></section>
+            <section class="tour-drawer panel hidden" id="tourDrawer" aria-live="polite"></section>
+          </div>
+          <section class="timeline" aria-label="Chapter order" hidden><div class="timeline-header"><div class="timeline-date"><span id="timelineChapter" class="eyebrow"></span><output id="dateLabel" for="timelineRange" aria-describedby="timelineChapter"></output></div></div><input id="timelineRange" type="range" min="1" max="1" step="1" aria-label="Chapter in narrative order"></section>
+        </section>
+      </section>
+    </main>
+    <footer class="site-footer">This is a relative map of the text. It is not placed on any real land. <span aria-hidden="true">·</span> Positions and miles follow John L. Sorenson’s estimates in <i>Mormon’s Map</i> (2000). <span aria-hidden="true">·</span> <span id="scriptureAttribution">The Book of Mormon · Public-domain text file</span></footer>
+    <div id="toast" role="status" class="toast hidden"></div>
+    <dialog id="libraryDialog"><button class="dialog-close" aria-label="Close source library">×</button><div id="libraryContent"></div></dialog>
+    <dialog id="sourceDialog" aria-labelledby="sourceDialogTitle"><button class="dialog-close" aria-label="Close source details">×</button><div id="sourceContent"></div></dialog>
+  </div>
+  <section id="localLaunchHelp" hidden style="max-width:620px;margin:12vh auto;padding:28px;line-height:1.6">
+    <h1>Open Book of Mormon Wayfinder through its local server</h1>
+    <p>The map will not work if you open this file by itself.</p>
+    <p>Open the Book of Mormon Wayfinder folder. Double-click <strong>Start Book of Mormon Wayfinder.cmd</strong>. Keep that window open while you study.</p>
+    <p><a href="http://127.0.0.1:4174/" style="color:#92e5ff">Open Book of Mormon Wayfinder</a></p>
+  </section>
+  <script src="vendor/leaflet.js"></script>
+  <script>
+    if (location.protocol === 'file:') {
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('localLaunchHelp').hidden = false;
+    } else {
+      const appScript = document.createElement('script');
+      appScript.type = 'module';
+      appScript.src = 'app.js?v=20261013.2';
+      document.body.append(appScript);
+    }
+  </script>
+</body></html>

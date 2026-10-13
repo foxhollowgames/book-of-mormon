@@ -1,0 +1,12 @@
+{
+  "name": "book-of-mormon-wayfinder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "build": "node scripts/prepare-scripture.mjs && node scripts/build-content.mjs",
+    "relief": "python scripts/render-relief.py",
+    "check": "node scripts/check.mjs && node --check dist/app.js"
+  }
+}
