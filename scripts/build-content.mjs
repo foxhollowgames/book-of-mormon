@@ -4,6 +4,7 @@ import { smoothCourse } from './organic-shapes.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import * as newWorld from './geography.mjs';
 import * as oldWorld from './old-world.mjs';
+import * as people from './people.mjs';
 
 // Mormon's map and the Old World stage of 1 Nephi share one list of places, areas, and paths.
 const geo = { ...newWorld, places: [...oldWorld.places, ...newWorld.places], areas: [...oldWorld.areas, ...newWorld.areas],
@@ -17,6 +18,10 @@ const chapterCopy = new Map((await readFile(new URL('./chapter-copy.tsv', import
     if (!title || !summary) throw new Error(`Incomplete chapter copy: ${chapter}`);
     return [chapter, { title, summary, sourceIds: ['bom-text'] }];
   }));
+// Dates follow the Church edition's date line under each chapter heading.
+const chapterDates = new Map((await readFile(new URL('./chapter-dates.tsv', import.meta.url), 'utf8'))
+  .split(/\r?\n/).filter(line => line && !line.startsWith('#')).map(line => line.split('|')));
+if (chapterIds.some(id => !chapterDates.get(id))) throw new Error('Every chapter needs a date label.');
 if (chapterCopy.size !== chapterIds.length || chapterIds.some(id => !chapterCopy.has(id))) {
   throw new Error('Every chapter needs one original summary.');
 }
@@ -55,7 +60,8 @@ const sources = [
   { id: 'leaflet', title: 'Leaflet', author: 'Volodymyr Agafonkin and contributors', year: 2023, type: 'Map software',
     url: 'https://leafletjs.com/', summary: 'Leaflet draws the map. This app uses a flat grid of miles, not a globe.',
     limitations: 'The software does not add facts to the map.', license: 'BSD 2-Clause license. See dist/vendor/leaflet-LICENSE.txt.' },
-  ...oldWorld.sources
+  ...oldWorld.sources,
+  ...people.sources
 ];
 
 // ---------- Chapter mentions ----------
@@ -81,13 +87,15 @@ const chapterMaps = chapterIds.map(chapter => {
   const placeMentions = {}, areaMentions = {};
   for (const place of geo.places) { const v = mentions(place, chapter); if (v.length) placeMentions[place.id] = v; }
   for (const area of geo.areas) { const v = mentions(area, chapter); if (v.length) areaMentions[area.id] = v; }
+  const personMentions = {};
+  for (const person of people.people) { const v = mentions(person, chapter); if (v.length) personMentions[person.id] = v; }
   const routes = geo.routes.filter(r => r.chapters.includes(chapter)).map(r => r.id);
   const impacts = geo.impacts[chapter] || [];
   // Route endpoints join the chapter focus even when the chapter does not name them.
   const routePlaces = geo.routes.filter(r => routes.includes(r.id)).flatMap(r => r.points.filter(p => typeof p === 'string'));
   const focus = [...new Set([...Object.keys(placeMentions), ...routePlaces, ...impacts.map(i => i.place), ...(oldWorld.focus[chapter] || [])])];
-  return { chapter, ...chapterCopy.get(chapter), contextNote: contextNotes[chapter] || null,
-    placeMentions, areaMentions, routes, impacts, focusPlaceIds: focus, oldWorld: oldWorld.isOldWorldChapter(chapter),
+  return { chapter, ...chapterCopy.get(chapter), dateLabel: chapterDates.get(chapter), contextNote: contextNotes[chapter] || null,
+    placeMentions, areaMentions, personMentions, routes, impacts, focusPlaceIds: focus, oldWorld: oldWorld.isOldWorldChapter(chapter),
     figures: geo.figures.filter(f => f.chapter === chapter).map(f => f.n) };
 });
 
@@ -117,9 +125,10 @@ const content = {
   geography: { land: geo.land, terrain: geo.terrain, waters: geo.waters, sidon: smoothCourse(geo.sidonCourse), labels: geo.labels },
   places: geo.places.map(({ chapters, books, notBooks, ...rest }) => rest),
   areas: geo.areas.map(({ chapters, books, notBooks, ...rest }) => rest),
+  people: people.people.map(({ chapters, books, notBooks, ...rest }) => rest),
   routes: geo.routes, distances: geo.distances, figures: geo.figures
 };
 await writeFile(new URL('../dist/data/content.json', import.meta.url), JSON.stringify(content));
 const mapped = chapterMaps.filter(c => c.focusPlaceIds.length).length;
-console.log(`Wrote ${content.places.length} places, ${content.routes.length} paths, ${content.distances.length} distance notes, ${geo.figures.length} figures. ${mapped} of ${chapterMaps.length} chapters have map places.`);
+console.log(`Wrote ${content.places.length} places, ${content.people.length} people and terms, ${content.routes.length} paths, ${content.distances.length} distance notes, ${geo.figures.length} figures. ${mapped} of ${chapterMaps.length} chapters have map places.`);
 export { refChapter };

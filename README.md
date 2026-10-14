@@ -30,7 +30,9 @@ Eight map passages also have an original context note and an exact scripture quo
 The chapter block follows Bible Wayfinder's title, prose, and collapsed **Paths and facts** layout.
 Place names in each verse open the place card. 103 chapters have map places.
 Open **Map context** in the layer panel for named-place chips and area names.
-People profiles are not part of this app's data. No placeholder people cards are added.
+Names of people, peoples, objects, and terms in each verse open a study card. There are 297 entries in `scripts/people/`, joined by `scripts/people.mjs`. A card gives the person's role, the text's key verses, and related entries. 63 entries also have a separate **Scholarship** section. It cites trusted research, such as the BYU Book of Mormon Onomasticon and Scripture Central. Shared names, such as the four Nephis, are limited by chapter. `npm run check` fails when two entries claim the same words.
+Each chapter heading shows a date. The dates in `scripts/chapter-dates.tsv` come from the Church edition at churchofjesuschrist.org. The Jaredite chapters of Ether have no date there, so they say so.
+Chapter introductions ground each new name with a short role the first time it appears.
 
 Place dots, labels, paths, terrain zones, distance lines, and destruction rings have click handlers.
 Place labels have a full-size target that reaches the dot. They also support keyboard activation.

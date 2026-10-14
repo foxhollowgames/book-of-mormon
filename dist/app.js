@@ -7,13 +7,13 @@ import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v
 import { initBookCrumb } from './breadcrumbs.js?v=20261013.1';
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
-const releaseVersion = '20261013.6';
+const releaseVersion = '20261014.1';
 const storeKey = 'bom-wayfinder-state';
 const defaults = { chapter: 'alma-22', verse: 27, lens: 'sorenson', studyMode: 'read', layers: { places: true, zones: false, paths: true, distances: false, guesses: true }, map: null };
 let saved = readSaved();
 // Study mode and lens are shared with the book directory, like Bible Wayfinder's menu.
 let state = { ...defaults, ...saved, ...readPreferences(), layers: { ...defaults.layers, ...(saved.layers || {}) } };
-let data = { sources: [], chapterMaps: [], guides: [], places: [], areas: [], routes: [], distances: [], figures: [], geography: {} };
+let data = { sources: [], chapterMaps: [], guides: [], places: [], areas: [], people: [], routes: [], distances: [], figures: [], geography: {} };
 let scripture = { books: [], chapters: {} };
 let map, chapterIds = [], toastTimer, guideState = null, guideOverlay = null, mapHome = null, stageId = 'new';
 
@@ -60,6 +60,7 @@ function esc(s = '') { const d = document.createElement('div'); d.textContent = 
 function showToast(message) { const el = $('#toast'); el.textContent = message; el.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add('hidden'), 4200); }
 const source = id => data.sources.find(s => s.id === id);
 const place = id => data.places.find(p => p.id === id);
+const person = id => data.people?.find(p => p.id === id);
 const chapterInfo = (id = state.chapter) => scripture.chapters[id];
 const chapterMap = (id = state.chapter) => data.chapterMaps.find(c => c.chapter === id);
 const ll = ([x, y]) => [y, x];
@@ -162,6 +163,8 @@ function onClick(e) {
   if (mode) { selectStudyMode(mode.dataset.studyMode); return; }
   const lens = e.target.closest('[data-lens]');
   if (lens) { state.lens = lens.dataset.lens; renderAll(); persist(); return; }
+  const personLink = e.target.closest('[data-person-id]');
+  if (personLink) { const p = person(personLink.dataset.personId); if (p) openFeature(p, 'person', personLink); return; }
   const placeLink = e.target.closest('[data-place-id]');
   if (placeLink) { const p = place(placeLink.dataset.placeId); if (p) { panTo(p.at); openFeature(p, 'place'); } return; }
   const routeLink = e.target.closest('[data-route-id]');
@@ -224,8 +227,19 @@ function scrollVerse(verse) {
 // ---------- Scripture sidebar ----------
 function verseHtml(v, cm) {
   const ids = Object.entries(cm?.placeMentions || {}).filter(([, verses]) => verses.includes(v.verse)).map(([id]) => id);
-  // Find the first match for each named place, then build the markup once.
+  const people = Object.entries(cm?.personMentions || {}).filter(([, verses]) => verses.includes(v.verse)).map(([id]) => person(id)).filter(Boolean);
+  // Find the first match for each name, then build the markup once.
+  // A priority entry, such as "people of Zarahemla", claims its words before a place does.
   const spans = [];
+  const addPeople = list => {
+    for (const p of list) for (const pattern of p.match || []) {
+      const m = new RegExp(pattern).exec(v.text);
+      if (!m) continue;
+      if (!spans.some(s => m.index < s.end && m.index + m[0].length > s.start)) spans.push({ id: p.id, name: p.name, start: m.index, end: m.index + m[0].length, person: true });
+      break;
+    }
+  };
+  addPeople(people.filter(p => p.priority));
   for (const id of ids) {
     const p = place(id);
     for (const pattern of p?.match || []) {
@@ -235,10 +249,13 @@ function verseHtml(v, cm) {
       break;
     }
   }
+  // Other people and terms link after places, so a place name keeps its map link.
+  addPeople(people.filter(p => !p.priority));
   spans.sort((a, b) => a.start - b.start);
   let html = '', cursor = 0;
   for (const s of spans) {
-    html += esc(v.text.slice(cursor, s.start)) + `<button type="button" class="entity-inline-link" data-place-id="${esc(s.id)}" aria-label="Show ${esc(s.name)} on the map">${esc(v.text.slice(s.start, s.end))}</button>`;
+    const link = s.person ? `data-person-id="${esc(s.id)}" aria-haspopup="dialog" aria-label="About ${esc(s.name)}"` : `data-place-id="${esc(s.id)}" aria-label="Show ${esc(s.name)} on the map"`;
+    html += esc(v.text.slice(cursor, s.start)) + `<button type="button" class="entity-inline-link${s.person ? ' person-inline-link' : ''}" ${link}>${esc(v.text.slice(s.start, s.end))}</button>`;
     cursor = s.end;
   }
   html += esc(v.text.slice(cursor));
@@ -264,12 +281,15 @@ function mapContextHtml(cm) {
   const chips = named.length ? `<p class="place-chips">${named.map(p => `<button type="button" class="place-chip conf-${p.conf}" data-place-id="${esc(p.id)}">${esc(p.name)}</button>`).join('')}</p>` : '';
   return `${empty}<details><summary>Map context</summary><p>${scope}</p>${chips}${areas.length ? `<p>${areas.map(a => esc(a.name)).join(' · ')}</p>` : ''}</details>`;
 }
+function chapterDateHtml(cm) {
+  return cm?.dateLabel ? `<p class="chapter-date" aria-label="Approximate date: ${esc(cm.dateLabel)}">${esc(cm.dateLabel)}</p>` : '';
+}
 function renderScripture() {
   const info = chapterInfo(), cm = chapterMap();
   const book = scripture.books.find(b => b.book === info.book);
   const i = book.chapters.indexOf(state.chapter);
   const nums = book.chapters.map(id => scripture.chapters[id].chapter), n = info.chapter, many = nums.length > 1;
-  const heading = `<div class="scripture-heading"><button class="sidebar-next" data-action="chapter-prev" aria-label="Previous chapter" ${i === 0 ? 'disabled' : ''}>‹</button><div class="chapter-picker-block"><h1 class="chapter-picker"><button type="button" class="chapter-picker-trigger" aria-label="${many ? `Choose ${esc(info.book)} chapter, current chapter ${n}` : `${esc(info.book)} ${n}, the only chapter`}" aria-haspopup="listbox" aria-expanded="false" aria-controls="chapterPickerMenu" ${many ? '' : 'disabled'}>${esc(info.label)}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg></button></h1></div><div id="chapterPickerMenu" class="chapter-picker-menu" popover="auto" role="listbox" aria-label="Choose ${esc(info.book)} chapter">${nums.map(c => `<button type="button" role="option" aria-label="${esc(info.book)} chapter ${c}" aria-selected="${c === n}" tabindex="-1" data-value="${c}"><span>${c}</span><span class="chapter-picker-check" aria-hidden="true">${c === n ? '✓' : ''}</span></button>`).join('')}</div><button class="sidebar-next" data-action="chapter-next" aria-label="Next chapter" ${i === book.chapters.length - 1 ? 'disabled' : ''}>›</button></div>`;
+  const heading = `<div class="scripture-heading"><button class="sidebar-next" data-action="chapter-prev" aria-label="Previous chapter" ${i === 0 ? 'disabled' : ''}>‹</button><div class="chapter-picker-block"><h1 class="chapter-picker"><button type="button" class="chapter-picker-trigger" aria-label="${many ? `Choose ${esc(info.book)} chapter, current chapter ${n}` : `${esc(info.book)} ${n}, the only chapter`}" aria-haspopup="listbox" aria-expanded="false" aria-controls="chapterPickerMenu" ${many ? '' : 'disabled'}>${esc(info.label)}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg></button></h1>${chapterDateHtml(cm)}</div><div id="chapterPickerMenu" class="chapter-picker-menu" popover="auto" role="listbox" aria-label="Choose ${esc(info.book)} chapter">${nums.map(c => `<button type="button" role="option" aria-label="${esc(info.book)} chapter ${c}" aria-selected="${c === n}" tabindex="-1" data-value="${c}"><span>${c}</span><span class="chapter-picker-check" aria-hidden="true">${c === n ? '✓' : ''}</span></button>`).join('')}</div><button class="sidebar-next" data-action="chapter-next" aria-label="Next chapter" ${i === book.chapters.length - 1 ? 'disabled' : ''}>›</button></div>`;
   $('#sidebarContent').innerHTML = heading + chapterIntroHtml(cm) + info.verses.map(v => verseHtml(v, cm)).join('');
   if (many) initChapterPicker($('#sidebarContent'), n, nums, c => selectChapter(book.chapters[nums.indexOf(c)]));
   // The last crumb names the open book and lists the other books.
@@ -375,12 +395,26 @@ function terrainCardHtml(t) {
 function impactCardHtml(p) {
   return `<span class="eyebrow">Destruction / distress</span><h2>${esc(p.name)}</h2><div class="feature-prose"><p>${esc(p.impact.text)} ${refButton(p.impact.ref)}</p>${verseQuote(state.chapter, refTarget(p.impact.ref).verse)}</div>${sourcesHtml(['bom-text'])}`;
 }
+const personKinds = { person: 'Person', group: 'People', object: 'Object', term: 'Term', title: 'Title' };
+function personCardHtml(p) {
+  const verses = chapterMap()?.personMentions?.[p.id] || [];
+  const here = verses.length ? `<div class="word-section"><h3>In ${esc(chapterInfo().label)}</h3>${verseQuote(state.chapter, verses[0])}${verses.length > 1 ? `<p class="muted">Also in verses ${verses.slice(1).map(v => refButton(`${chapterInfo().label}:${v}`)).join(', ')}.</p>` : ''}</div>` : '';
+  const related = (p.related || []).map(person).filter(Boolean);
+  const links = related.length ? `<div class="word-section"><h3>Related</h3><p class="place-chips">${related.map(r => `<button type="button" class="place-chip" data-person-id="${esc(r.id)}">${esc(r.name)}</button>`).join('')}</p></div>` : '';
+  const scholarship = (p.scholarship || []).map(n => {
+    const s = source(n.sourceId);
+    const cite = s ? ` <a class="source-inline-citation" href="${esc(s.url)}" data-source-id="${esc(s.id)}" aria-haspopup="dialog">${esc(s.author)}, ${esc(s.year)}</a>` : '';
+    return `<p>${esc(n.text)}${cite}</p>`;
+  }).join('');
+  const ids = ['bom-text', ...(p.scholarship || []).map(n => n.sourceId)];
+  return `<span class="eyebrow">${esc(personKinds[p.kind] || 'Person')}</span><h2>${esc(p.name)}</h2>${p.role ? `<span class="badge">${esc(p.role)}</span>` : ''}${p.era ? ` <span class="badge">${esc(p.era)}</span>` : ''}<div class="feature-prose"><p>${esc(p.summary)}</p>${p.detail ? `<p>${esc(p.detail)}</p>` : ''}</div>${here}<div class="feature-prose">${refsHtml(p.refs || [])}</div>${scholarship ? `<div class="word-section"><h3>Scholarship</h3>${scholarship}</div>` : ''}${links}${sourcesHtml(ids)}`;
+}
 function openFeature(item, type, origin) {
   const card = $('#contextCard');
   card.dataset.feature = `${type}:${item.id}`;
   card.dataset.pinned = 'true';
   card._origin = origin?.getElement?.() || origin || card._origin;
-  const body = type === 'impact' ? impactCardHtml(item) : type === 'place' ? placeCardHtml(item) : type === 'route' ? routeCardHtml(item) : type === 'distance' ? distanceCardHtml(item) : terrainCardHtml(item);
+  const body = type === 'person' ? personCardHtml(item) : type === 'impact' ? impactCardHtml(item) : type === 'place' ? placeCardHtml(item) : type === 'route' ? routeCardHtml(item) : type === 'distance' ? distanceCardHtml(item) : terrainCardHtml(item);
   card.innerHTML = `<button class="dialog-close" data-action="close-card" aria-label="Close details">×</button>${body}`;
   openStudyModal('contextCard', card.dataset.feature);
   card.scrollTop = 0;

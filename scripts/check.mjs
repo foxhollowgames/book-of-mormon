@@ -109,6 +109,30 @@ for (const chapter of content.chapterMaps) {
   }
 }
 
+// People and terms: references, links, sources, and at least one linked verse.
+const personIds = new Set(content.people.map(p => p.id)), sourceIds = new Set(content.sources.map(s => s.id));
+for (const p of content.people) {
+  for (const r of p.refs || []) { verses(r.ref); prose(r.note, `${p.id}.refs`); }
+  prose(p.summary, `${p.id}.summary`); prose(p.detail, `${p.id}.detail`);
+  if (!p.summary) errors.push(`${p.id}: missing summary`);
+  for (const n of p.scholarship || []) { prose(n.text, `${p.id}.scholarship`); if (!sourceIds.has(n.sourceId)) errors.push(`${p.id}: unknown source ${n.sourceId}`); }
+  for (const id of p.related || []) if (!personIds.has(id)) errors.push(`${p.id}: unknown related entry ${id}`);
+  if (!content.chapterMaps.some(c => c.personMentions?.[p.id])) errors.push(`${p.id}: the name links in no verse`);
+}
+// Two entries must not claim the same words in one verse.
+for (const c of content.chapterMaps) {
+  const verseList = scripture.chapters[c.chapter].verses;
+  for (const v of verseList) {
+    const hits = Object.entries(c.personMentions || {}).filter(([, vs]) => vs.includes(v.verse)).flatMap(([id]) => {
+      const p = content.people.find(x => x.id === id);
+      for (const pattern of p.match) { const m = new RegExp(pattern).exec(v.text); if (m) return [{ id, start: m.index, end: m.index + m[0].length }]; }
+      return [];
+    });
+    for (let i = 0; i < hits.length; i++) for (let j = i + 1; j < hits.length; j++)
+      if (hits[i].start < hits[j].end && hits[j].start < hits[i].end) errors.push(`${c.chapter}:${v.verse}: ${hits[i].id} and ${hits[j].id} claim the same words`);
+  }
+}
+
 if (warnings.length) console.log(`Review notes (${warnings.length}):\n  ${warnings.join('\n  ')}`);
 if (errors.length) { console.error(`Check failed (${errors.length}):\n  ${errors.join('\n  ')}`); process.exit(1); }
-console.log(`Check passed: ${geo.places.length} places, ${geo.routes.length} paths, ${content.chapterMaps.length} chapters, every reference found, every marker on land, sentences within 15 words.`);
+console.log(`Check passed: ${geo.places.length} places, ${geo.routes.length} paths, ${content.chapterMaps.length} chapters, ${content.people.length} people and terms, every reference found, every marker on land, sentences within 15 words.`);
