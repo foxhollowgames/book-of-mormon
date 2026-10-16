@@ -178,10 +178,7 @@ function onChange(e) {
   if (e.target.matches('[data-layer]')) { state.layers[e.target.dataset.layer] = e.target.checked; drawOverlays(); persist(); }
 }
 function performAction(action, id) {
-  const chapters = scripture.books.find(b => b.book === chapterInfo().book).chapters;
-  const i = chapters.indexOf(state.chapter);
-  if (action === 'chapter-prev' && i > 0) selectChapter(chapters[i - 1]);
-  if (action === 'chapter-next' && i < chapters.length - 1) selectChapter(chapters[i + 1]);
+  if (action === 'chapter-prev' || action === 'chapter-next') { const next = chapterStep(action === 'chapter-prev'); if (next) selectChapter(next); }
   if (action === 'focus-chapter') focusChapterMap();
   if (action === 'close-card') closeCard();
   if (action === 'toggle-layers') { const collapsed = $('#layerOptions').classList.toggle('hidden'); $('#layerToggle').setAttribute('aria-expanded', String(!collapsed)); }
@@ -202,6 +199,10 @@ function renderAll(first = false) {
   drawOverlays();
   if (first) { focusChapterMap(false); setTimeout(() => focusChapterMap(false), 250); }
 }
+// Previous and Next continue across books: the last chapter of a book leads to chapter 1 of the next book.
+function chapterStep(back) { const all = scripture.books.flatMap(b => b.chapters), i = all.indexOf(state.chapter); return all[i + (back ? -1 : 1)]; }
+function chapterStepLabel(back) { const next = chapterStep(back), info = next && chapterInfo(next); if (info && info.book !== chapterInfo().book) return `${back ? 'Previous book' : 'Next book'}: ${info.label}`; return back ? 'Previous chapter' : 'Next chapter'; }
+function chapterStepButton(back) { const label = esc(chapterStepLabel(back)); return `<button class="sidebar-next" data-action="${back ? 'chapter-prev' : 'chapter-next'}" aria-label="${label}" title="${label}" ${chapterStep(back) ? '' : 'disabled'}>${back ? '‹' : '›'}</button>`; }
 function selectChapter(id, verse = 1) {
   if (!scripture.chapters[id]) return;
   const changed = id !== state.chapter;
@@ -287,9 +288,8 @@ function chapterDateHtml(cm) {
 function renderScripture() {
   const info = chapterInfo(), cm = chapterMap();
   const book = scripture.books.find(b => b.book === info.book);
-  const i = book.chapters.indexOf(state.chapter);
   const nums = book.chapters.map(id => scripture.chapters[id].chapter), n = info.chapter, many = nums.length > 1;
-  const heading = `<div class="scripture-heading"><button class="sidebar-next" data-action="chapter-prev" aria-label="Previous chapter" ${i === 0 ? 'disabled' : ''}>‹</button><div class="chapter-picker-block"><h1 class="chapter-picker"><button type="button" class="chapter-picker-trigger" aria-label="${many ? `Choose ${esc(info.book)} chapter, current chapter ${n}` : `${esc(info.book)} ${n}, the only chapter`}" aria-haspopup="listbox" aria-expanded="false" aria-controls="chapterPickerMenu" ${many ? '' : 'disabled'}>${esc(info.label)}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg></button></h1>${chapterDateHtml(cm)}</div><div id="chapterPickerMenu" class="chapter-picker-menu" popover="auto" role="listbox" aria-label="Choose ${esc(info.book)} chapter">${nums.map(c => `<button type="button" role="option" aria-label="${esc(info.book)} chapter ${c}" aria-selected="${c === n}" tabindex="-1" data-value="${c}"><span>${c}</span><span class="chapter-picker-check" aria-hidden="true">${c === n ? '✓' : ''}</span></button>`).join('')}</div><button class="sidebar-next" data-action="chapter-next" aria-label="Next chapter" ${i === book.chapters.length - 1 ? 'disabled' : ''}>›</button></div>`;
+  const heading = `<div class="scripture-heading">${chapterStepButton(true)}<div class="chapter-picker-block"><h1 class="chapter-picker"><button type="button" class="chapter-picker-trigger" aria-label="${many ? `Choose ${esc(info.book)} chapter, current chapter ${n}` : `${esc(info.book)} ${n}, the only chapter`}" aria-haspopup="listbox" aria-expanded="false" aria-controls="chapterPickerMenu" ${many ? '' : 'disabled'}>${esc(info.label)}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg></button></h1>${chapterDateHtml(cm)}</div><div id="chapterPickerMenu" class="chapter-picker-menu" popover="auto" role="listbox" aria-label="Choose ${esc(info.book)} chapter">${nums.map(c => `<button type="button" role="option" aria-label="${esc(info.book)} chapter ${c}" aria-selected="${c === n}" tabindex="-1" data-value="${c}"><span>${c}</span><span class="chapter-picker-check" aria-hidden="true">${c === n ? '✓' : ''}</span></button>`).join('')}</div>${chapterStepButton(false)}</div>`;
   $('#sidebarContent').innerHTML = heading + chapterIntroHtml(cm) + info.verses.map(v => verseHtml(v, cm)).join('');
   if (many) initChapterPicker($('#sidebarContent'), n, nums, c => selectChapter(book.chapters[nums.indexOf(c)]));
   // The last crumb names the open book and lists the other books.
