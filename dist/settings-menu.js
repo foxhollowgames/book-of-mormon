@@ -1,6 +1,6 @@
 // The book directory and the reader share this menu. Choices apply to every book.
 const preferenceKey = 'bom-wayfinder-preferences';
-const choices = { studyMode: ['read', 'map'], perspective: ['historical', 'lds'], lens: ["text", "sorenson"] };
+const choices = { studyMode: ['read', 'map'], perspective: ['historical', 'lds'] };
 
 export function readPreferences() {
   let saved = {};

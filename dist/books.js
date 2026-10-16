@@ -1,21 +1,19 @@
 // Book of Mormon directory, built on the Bible Wayfinder directory.
-import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261013.4';
+import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261016.1';
 
 // The menu sets how each book opens. The reader uses the same choices.
 const menu = document.querySelector('#settingsMenu');
-const preferences = { studyMode: 'read', lens: 'sorenson', ...readPreferences() };
+const preferences = { studyMode: 'read', ...readPreferences() };
 function showPreferences() {
-  for (const button of menu.querySelectorAll('[data-study-mode],[data-lens]')) {
-    const active = button.dataset.studyMode === preferences.studyMode || button.dataset.lens === preferences.lens;
+  for (const button of menu.querySelectorAll('[data-study-mode]')) {
+    const active = button.dataset.studyMode === preferences.studyMode;
     button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active));
   }
 }
 initMenu(menu);
 menu.addEventListener('click', event => {
-  const mode = event.target.closest('[data-study-mode]'), lens = event.target.closest('[data-lens]');
-  if (mode) preferences.studyMode = mode.dataset.studyMode;
-  if (lens) preferences.lens = lens.dataset.lens;
-  if (mode || lens) { savePreferences(preferences); showPreferences(); }
+  const mode = event.target.closest('[data-study-mode]');
+  if (mode) { preferences.studyMode = mode.dataset.studyMode; savePreferences(preferences); showPreferences(); }
 });
 showPreferences();
 addEventListener('pageshow', () => { Object.assign(preferences, readPreferences()); showPreferences(); });
