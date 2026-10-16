@@ -183,12 +183,18 @@ path.map-feature.campaign-hit:hover,path.map-feature.campaign-hit:focus-visible{
 .chapter-picker-menu [role=option]:focus{outline:none;border-color:var(--cyan);background:#124766}
 .chapter-picker-check{width:16px;flex-shrink:0}
 .sidebar-next:disabled{opacity:.3;cursor:default}
+/* Map-event buttons sit outside the chapter arrows. The pin shows they jump to the next path or place of loss on the map. */
+.scripture-heading .chapter-picker-block{flex:1}
+.sidebar-event{flex:none;display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid transparent;border-radius:8px;background:none;color:var(--cyan);cursor:pointer;touch-action:manipulation}
+.sidebar-event:not(:disabled):hover{background:#062441;border-color:#37617e}
+.sidebar-event:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.sidebar-event:disabled{opacity:.3;cursor:default}
 /* A one-chapter book has no other chapter to choose, so its chevron dims like the arrows. */
 .chapter-picker-trigger:disabled{cursor:default;background:transparent;border-color:transparent}.chapter-picker-trigger:disabled svg{opacity:.3}
 /* Phones: move the chapter arrows in from the screen edge and give them a full touch target. */
-@media(max-width:720px){.sidebar-next{flex:none;display:grid;place-items:center;width:48px;height:48px;padding:0 0 6px;line-height:1;border-radius:8px;touch-action:manipulation}.sidebar-next:not(:disabled):active{background:#062441}.sidebar-next:first-child{margin-left:8px}.sidebar-next:last-child{margin-right:8px}.scripture-heading{gap:4px}
+@media(max-width:720px){.sidebar-next{flex:none;display:grid;place-items:center;width:48px;height:48px;padding:0 0 6px;line-height:1;border-radius:8px;touch-action:manipulation}.sidebar-next:not(:disabled):active{background:#062441}.sidebar-next:first-child,.sidebar-event:first-child{margin-left:8px}.sidebar-next:last-child,.sidebar-event:last-child{margin-right:8px}.scripture-heading{gap:4px}.sidebar-event{width:36px;height:48px}.sidebar-event svg{width:22px;height:22px}
 /* The title shrinks on narrow phones so the longest book names still fit between the arrows. */
-.scripture-heading .chapter-picker{font-size:clamp(18px,calc((100vw - 190px)*.128),31px)}.chapter-picker-trigger{padding-inline:24px}.chapter-picker-trigger svg{right:6px}}
+.scripture-heading .chapter-picker{font-size:clamp(18px,calc((100vw - 190px)*.128),31px)}.scripture-heading:has(.sidebar-event) .chapter-picker{font-size:clamp(16px,calc((100vw - 270px)*.128),31px)}.chapter-picker-trigger{padding-inline:24px}.chapter-picker-trigger svg{right:6px}}
 
 
 .map-recenter{position:absolute;z-index:3;top:22px;left:50%;transform:translateX(-50%);padding:6px 14px;border:1px solid #72a6bd;border-radius:4px;background:#123f57;color:#e9f6ff;font:inherit;font-size:13px;cursor:pointer;box-shadow:0 2px 8px #0006}.map-recenter:hover,.map-recenter:focus-visible{background:#17678a}.map-recenter[hidden]{display:none}@media(max-width:480px){.map-recenter{top:10px;left:calc(50% + 82px)}}.map-note details{margin-bottom:6px}.map-note summary{cursor:pointer}

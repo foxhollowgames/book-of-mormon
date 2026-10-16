@@ -15,6 +15,8 @@ let saved = readSaved();
 let state = { ...defaults, ...saved, ...readPreferences(), layers: { ...defaults.layers, ...(saved.layers || {}) } };
 let data = { sources: [], chapterMaps: [], guides: [], places: [], areas: [], people: [], routes: [], distances: [], figures: [], geography: {} };
 let scripture = { books: [], chapters: {} };
+// Chapters with a path or a place of loss on the map. The scrubber and the event buttons step through these across every book.
+let mapEvents = [];
 let map, chapterIds = [], toastTimer, guideState = null, guideOverlay = null, mapHome = null, stageId = 'new';
 
 const kindLabels = { city: 'City', land: 'Land', hill: 'Hill', water: 'Water', wilderness: 'Wilderness', pass: 'Pass', feature: 'Feature', place: 'Place', region: 'Area' };
@@ -90,6 +92,7 @@ async function load() {
   if (results[2].status === 'fulfilled') data.relief = results[2].value;
   if (results[3].status === 'fulfilled') data.reliefOld = results[3].value;
   chapterIds = scripture.books.flatMap(b => b.chapters);
+  mapEvents = chapterIds.filter(isEventChapter);
   if (!chapterIds.includes(state.chapter)) state.chapter = defaults.chapter;
   if (!chapterInfo()?.verses.some(v => v.verse === state.verse)) state.verse = 1;
   if (!['text', 'sorenson'].includes(state.lens)) state.lens = 'sorenson';
@@ -103,9 +106,11 @@ function buildStaticUi() {
   const closeMenu = initMenu($('#settingsMenu'));
   $('#settingsPanel').addEventListener('click', e => { if (e.target.closest('[data-study-mode], #guidesButton, #libraryButton')) closeMenu(true); });
   initScriptureResize();
+  // Each step is a map event. Without map events the scrubber steps through the open book's chapters.
+  if (mapEvents.length) $('#timelineRange').setAttribute('aria-label', 'Map event in narrative order');
   $('#timelineRange').addEventListener('input', e => {
-    const book = scripture.books.find(b => b.book === chapterInfo().book);
-    selectChapter(book.chapters[Number(e.target.value) - 1]);
+    const id = scrubChapters()[Number(e.target.value)];
+    if (id && id !== state.chapter) selectChapter(id);
   });
   $('#scriptureAttribution').textContent = `${scripture.translation || 'The Book of Mormon'} · ${scripture.copyright || 'Public-domain text file'}`;
   $('#layerOptions').innerHTML = [['places', 'Places', 'place'], ['guesses', 'Rough guesses', 'guess'], ['zones', 'Terrain zones', 'region'], ['paths', 'Paths', 'route'], ['distances', 'Sorenson’s distances', 'distance']]
@@ -182,6 +187,7 @@ function performAction(action, id) {
   const i = chapters.indexOf(state.chapter);
   if (action === 'chapter-prev' && i > 0) selectChapter(chapters[i - 1]);
   if (action === 'chapter-next' && i < chapters.length - 1) selectChapter(chapters[i + 1]);
+  if (action === 'event-prev' || action === 'event-next') { const next = adjacentMapEvent(action === 'event-prev' ? -1 : 1); if (next) selectChapter(next); }
   if (action === 'focus-chapter') focusChapterMap();
   if (action === 'close-card') closeCard();
   if (action === 'toggle-layers') { const collapsed = $('#layerOptions').classList.toggle('hidden'); $('#layerToggle').setAttribute('aria-expanded', String(!collapsed)); }
@@ -289,7 +295,7 @@ function renderScripture() {
   const book = scripture.books.find(b => b.book === info.book);
   const i = book.chapters.indexOf(state.chapter);
   const nums = book.chapters.map(id => scripture.chapters[id].chapter), n = info.chapter, many = nums.length > 1;
-  const heading = `<div class="scripture-heading"><button class="sidebar-next" data-action="chapter-prev" aria-label="Previous chapter" ${i === 0 ? 'disabled' : ''}>‹</button><div class="chapter-picker-block"><h1 class="chapter-picker"><button type="button" class="chapter-picker-trigger" aria-label="${many ? `Choose ${esc(info.book)} chapter, current chapter ${n}` : `${esc(info.book)} ${n}, the only chapter`}" aria-haspopup="listbox" aria-expanded="false" aria-controls="chapterPickerMenu" ${many ? '' : 'disabled'}>${esc(info.label)}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg></button></h1>${chapterDateHtml(cm)}</div><div id="chapterPickerMenu" class="chapter-picker-menu" popover="auto" role="listbox" aria-label="Choose ${esc(info.book)} chapter">${nums.map(c => `<button type="button" role="option" aria-label="${esc(info.book)} chapter ${c}" aria-selected="${c === n}" tabindex="-1" data-value="${c}"><span>${c}</span><span class="chapter-picker-check" aria-hidden="true">${c === n ? '✓' : ''}</span></button>`).join('')}</div><button class="sidebar-next" data-action="chapter-next" aria-label="Next chapter" ${i === book.chapters.length - 1 ? 'disabled' : ''}>›</button></div>`;
+  const heading = `<div class="scripture-heading">${mapEventButtonHtml(-1, adjacentMapEvent(-1))}<button class="sidebar-next" data-action="chapter-prev" aria-label="Previous chapter" ${i === 0 ? 'disabled' : ''}>‹</button><div class="chapter-picker-block"><h1 class="chapter-picker"><button type="button" class="chapter-picker-trigger" aria-label="${many ? `Choose ${esc(info.book)} chapter, current chapter ${n}` : `${esc(info.book)} ${n}, the only chapter`}" aria-haspopup="listbox" aria-expanded="false" aria-controls="chapterPickerMenu" ${many ? '' : 'disabled'}>${esc(info.label)}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg></button></h1>${chapterDateHtml(cm)}</div><div id="chapterPickerMenu" class="chapter-picker-menu" popover="auto" role="listbox" aria-label="Choose ${esc(info.book)} chapter">${nums.map(c => `<button type="button" role="option" aria-label="${esc(info.book)} chapter ${c}" aria-selected="${c === n}" tabindex="-1" data-value="${c}"><span>${c}</span><span class="chapter-picker-check" aria-hidden="true">${c === n ? '✓' : ''}</span></button>`).join('')}</div><button class="sidebar-next" data-action="chapter-next" aria-label="Next chapter" ${i === book.chapters.length - 1 ? 'disabled' : ''}>›</button>${mapEventButtonHtml(1, adjacentMapEvent(1))}</div>`;
   $('#sidebarContent').innerHTML = heading + chapterIntroHtml(cm) + info.verses.map(v => verseHtml(v, cm)).join('');
   if (many) initChapterPicker($('#sidebarContent'), n, nums, c => selectChapter(book.chapters[nums.indexOf(c)]));
   // The last crumb names the open book and lists the other books.
@@ -319,13 +325,34 @@ function renderView() {
   $$('[data-study-mode]').forEach(b => { const on = b.dataset.studyMode === state.studyMode; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
   requestAnimationFrame(() => map?.invalidateSize({ pan: false }));
 }
+// A map event is a chapter that draws a path or a place of loss.
+// A chapter that only names places is not a map event.
+function isEventChapter(id) {
+  const cm = chapterMap(id);
+  return !!cm && ((cm.routes || []).some(r => data.routes.some(x => x.id === r)) || (cm.impacts || []).some(i => place(i.place)));
+}
+// Events run across every book, so the buttons can cross from one book to the next.
+function adjacentMapEvent(direction, id = state.chapter) {
+  const at = chapterIds.indexOf(id);
+  return direction < 0 ? mapEvents.findLast(c => chapterIds.indexOf(c) < at) : mapEvents.find(c => chapterIds.indexOf(c) > at);
+}
+// A map pin beside a chevron marks a jump to the next map event, not the next chapter.
+function mapEventButtonHtml(direction, target) {
+  if (!mapEvents.length) return '';
+  const label = `${direction < 0 ? 'Previous' : 'Next'} map event${target ? `: ${scripture.chapters[target].label}` : ''}`;
+  const chevron = direction < 0 ? '<path d="M8 7 3 12l5 5"/>' : '<path d="m16 7 5 5-5 5"/>';
+  const pin = direction < 0 ? '<path d="M15.5 20s-5-4.3-5-8.5a5 5 0 0 1 10 0c0 4.2-5 8.5-5 8.5z"/><circle cx="15.5" cy="11.5" r="1.7"/>' : '<path d="M8.5 20s-5-4.3-5-8.5a5 5 0 0 1 10 0c0 4.2-5 8.5-5 8.5z"/><circle cx="8.5" cy="11.5" r="1.7"/>';
+  return `<button class="sidebar-event" data-action="event-${direction < 0 ? 'prev' : 'next'}" aria-label="${esc(label)}" title="${esc(label)}" ${target ? '' : 'disabled'}><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${chevron}${pin}</svg></button>`;
+}
+function scrubChapters() { return mapEvents.length ? mapEvents : scripture.books.find(b => b.book === chapterInfo().book).chapters; }
 function renderTimeline() {
-  const info = chapterInfo(), book = scripture.books.find(b => b.book === info.book);
-  const range = $('#timelineRange');
-  range.max = book.chapters.length;
-  range.value = info.chapter;
+  const info = chapterInfo(), steps = scrubChapters(), position = steps.indexOf(state.chapter);
+  const range = $('#timelineRange'), at = chapterIds.indexOf(state.chapter);
+  // A chapter between events keeps the handle on the event before it.
+  range.min = 0; range.max = steps.length - 1;
+  range.value = Math.max(0, steps.findLastIndex(c => chapterIds.indexOf(c) <= at));
   range.setAttribute('aria-valuetext', info.label);
-  $('#timelineChapter').textContent = 'Chapter order';
+  $('#timelineChapter').textContent = !mapEvents.length ? 'Chapter order' : position >= 0 ? `Map event ${position + 1} of ${steps.length}` : `Between map events · ${steps.length} in all`;
   $('#dateLabel').textContent = info.label;
 }
 
