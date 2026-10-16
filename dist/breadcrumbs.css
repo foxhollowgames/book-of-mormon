@@ -1,3 +1,4 @@
+/* Shared Wayfinder viewer file. Edit Wayfinder/viewer/breadcrumbs.css, then run npm run sync-viewer. Hash a3c95b6a3798. */
 /* The header trail: Wayfinder, the volume, then the book. The directory and the reader share it. */
 .crumbs{flex:1;min-width:0}
 .crumbs ol{display:flex;flex-wrap:wrap;align-items:center;margin:0;padding:0;list-style:none;color:var(--muted);font:700 17px/1.2 var(--serif);letter-spacing:1.2px;text-transform:uppercase}

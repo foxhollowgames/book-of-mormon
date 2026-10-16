@@ -1,5 +1,5 @@
 // Book of Mormon directory, built on the Bible Wayfinder directory.
-import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261016.1';
+import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261016.2';
 
 // The menu sets how each book opens. The reader uses the same choices.
 const menu = document.querySelector('#settingsMenu');

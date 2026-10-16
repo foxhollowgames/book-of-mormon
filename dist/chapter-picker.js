@@ -1,3 +1,4 @@
+// Shared Wayfinder viewer file. Edit Wayfinder/viewer/chapter-picker.js, then run npm run sync-viewer. Hash f2ca0c937f65.
 export function initChapterPicker(root, chapter, chapters, onSelect) {
   const trigger = root.querySelector('.chapter-picker-trigger');
   const menu = root.querySelector('.chapter-picker-menu');

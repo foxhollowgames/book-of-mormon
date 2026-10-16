@@ -2,6 +2,10 @@
 
 A local, map-first study guide for the Book of Mormon. It follows the Bible Wayfinder app shell (synced with Bible Wayfinder `main` at 48f5a45): the book directory, the book header with a back arrow, the shared Menu with Read and Map study modes, Recenter, the chapter picker, context cards, study guides, and the source library.
 
+## Shared files
+
+The shared reader files come from the Wayfinder repository: `breadcrumbs.js`, `breadcrumbs.css`, `chapter-picker.js`, `modal-drag.js`, and `settings-menu.js`. Each copy starts with a stamp line. Edit `Wayfinder/viewer/<file>`, then run `npm run sync-viewer` in the Wayfinder folder. Do not edit the copies in `dist/`. `dist/app.js` and `dist/styles.css` are still this volume's own reader.
+
 The home page is the book directory. It groups the 15 books into the small plates, Mormon’s abridgment, and Moroni’s additions. Each card shows the part of the relief map where that book’s places sit. A book opens in `book.html#chapter=<book>-<n>`. The study mode menu choice applies to every book.
 
 The map is **relative**. It is not placed on any real land or globe. It is drawn on a flat grid where one unit is one of John L. Sorenson's estimated miles, following *Mormon's Map* (FARMS, 2000). The city of Zarahemla is the origin.

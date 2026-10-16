@@ -1,10 +1,10 @@
 // Book of Mormon Wayfinder. Built on the Isaiah Study Guide app shell.
 // The map uses Leaflet's flat CRS. One map unit is one of Sorenson's estimated miles.
 // 1 Nephi 1–17 uses a second stage on the same grid: real land from Jerusalem to Arabia, far east of Mormon's map.
-import { initModalDragging } from './modal-drag.js?v=20261013.4';
-import { initChapterPicker } from './chapter-picker.js?v=20261013.4';
-import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261016.1';
-import { initBookCrumb } from './breadcrumbs.js?v=20261013.1';
+import { initModalDragging } from './modal-drag.js?v=20261016.2';
+import { initChapterPicker } from './chapter-picker.js?v=20261016.2';
+import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261016.2';
+import { initBookCrumb } from './breadcrumbs.js?v=20261016.2';
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const releaseVersion = '20261014.1';

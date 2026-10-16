@@ -1,3 +1,4 @@
+// Shared Wayfinder viewer file. Edit Wayfinder/viewer/breadcrumbs.js, then run npm run sync-viewer. Hash 25d35ec8f8b0.
 // The last crumb names the open book. It opens a list of the other books.
 // A volume with one book has no book crumb. The volume crumb is then the last one.
 // Each book is {name, url}. `current` is the open book.

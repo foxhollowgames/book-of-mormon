@@ -1,3 +1,4 @@
+// Shared Wayfinder viewer file. Edit Wayfinder/viewer/modal-drag.js, then run npm run sync-viewer. Hash abf61e27f2b8.
 // Keep each floating panel inside its viewport or map area.
 export function initModalDragging() {
   for (const panel of document.querySelectorAll('dialog, #contextCard, #tourDrawer')) {

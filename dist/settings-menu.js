@@ -1,10 +1,13 @@
-// The book directory and the reader share this menu. Choices apply to every book.
-const preferenceKey = 'bom-wayfinder-preferences';
-const choices = { studyMode: ['read', 'map'], perspective: ['historical', 'lds'] };
+// Shared Wayfinder viewer file. Edit Wayfinder/viewer/settings-menu.js, then run npm run sync-viewer. Hash a7ea3661a121.
+// The book directory and the reader share this menu. Choices apply to every book in every volume.
+const preferenceKey = 'bible-wayfinder-preferences';
+// The Book of Mormon kept its own choices before the volumes shared this menu. They still apply until a new choice replaces them.
+const legacyKeys = ['bom-wayfinder-preferences'];
+const choices = { studyMode: ['read', 'map'], perspective: ['historical', 'lds'], portraitMode: ['generated', 'non-generated'] };
 
 export function readPreferences() {
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(preferenceKey)) || {}; } catch {}
+  for (const key of [...legacyKeys, preferenceKey]) try { saved = { ...saved, ...JSON.parse(localStorage.getItem(key)) }; } catch {}
   return Object.fromEntries(Object.keys(choices).filter(key => choices[key].includes(saved[key])).map(key => [key, saved[key]]));
 }
 export function savePreferences(values) {
