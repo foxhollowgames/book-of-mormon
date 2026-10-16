@@ -116,9 +116,9 @@ function buildStaticUi() {
   });
   $('#scriptureAttribution').textContent = `${scripture.translation || 'The Book of Mormon'} · ${scripture.copyright || 'Public-domain text file'}`;
   // Place layers show the same dots the map draws: large for this chapter, small for other places.
-  const placeIcon = conf => `<span class="layer-swatch place-dots" title="Large blue dot: named in this chapter. Small dot: another place.">${placeDotSvg(conf, true)}${placeDotSvg(conf, false)}</span>`;
-  $('#layerOptions').innerHTML = [['places', 'Places', placeIcon('text'), '<small class="layer-hint" id="placesHint"></small>'], ['guesses', 'Rough guesses', placeIcon('guess')], ['zones', 'Terrain zones', '<span class="layer-swatch region"></span>'], ['paths', 'Paths', '<span class="layer-swatch route"></span>'], ['distances', 'Sorenson’s distances', '<span class="layer-swatch distance"></span>']]
-    .map(([key, label, icon, hint = '']) => `<label class="layer-option"><input type="checkbox" data-layer="${key}">${icon}<span>${label}${hint}</span></label>`).join('');
+  const placeIcon = conf => `<span class="layer-swatch place-dots">${placeDotSvg(conf, true)}${placeDotSvg(conf, false)}</span>`;
+  $('#layerOptions').innerHTML = [['places', 'Places', placeIcon('text')], ['guesses', 'Rough guesses', placeIcon('guess')], ['zones', 'Terrain zones', '<span class="layer-swatch region"></span>'], ['paths', 'Paths', '<span class="layer-swatch route"></span>'], ['distances', 'Sorenson’s distances', '<span class="layer-swatch distance"></span>']]
+    .map(([key, label, icon]) => `<label class="layer-option"><input type="checkbox" data-layer="${key}">${icon}<span>${label}</span></label>`).join('');
   // A book in the crumb list opens in this reader.
   $('#bookCrumb').addEventListener('click', e => {
     const link = e.target.closest('.crumb-menu a');
@@ -701,7 +701,6 @@ function layoutLabels() {
 function renderLegend() {
   const kinds = [...new Set(activeRoutes().map(r => r.kind))];
   const cm = chapterMap();
-  $('#placesHint').textContent = cm?.oldWorld ? 'Known or proposed site' : 'Text gives relations';
   $('.map-note').innerHTML = `<div class="movement-legend">${(state.layers.paths || guideOverlay) ? kinds.map(k => `<span><i style="background:${movementStyles[k].color}"></i>${movementStyles[k].label}</span>`).join('') : ''}${cm?.impacts?.length ? '<span><i class="impact-key"></i>Destroyed city</span>' : ''}</div>${mapContextHtml(cm)}`;
 }
 function syncSelection() {
