@@ -64,6 +64,13 @@ const person = id => data.people?.find(p => p.id === id);
 const chapterInfo = (id = state.chapter) => scripture.chapters[id];
 const chapterMap = (id = state.chapter) => data.chapterMaps.find(c => c.chapter === id);
 const ll = ([x, y]) => [y, x];
+// One style for each place dot. The map markers and the layer panel icons both use it.
+const placeDotStyle = (conf, on) => ({ radius: on ? 6.5 : 4, color: on ? '#fff4dc' : '#c9d6cf', weight: on ? 2.5 : 1.25, fillColor: on ? '#0877c4' : '#3b4a3a', fillOpacity: conf === 'guess' ? .35 : 1, dashArray: conf === 'guess' ? '2 3' : null });
+function placeDotSvg(conf, on) {
+  // Leaflet rounds a circle marker's radius, so the icon does too.
+  const s = placeDotStyle(conf, on), r = Math.max(Math.round(s.radius), 1), size = 2 * r + s.weight, c = size / 2;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true" focusable="false"><circle cx="${c}" cy="${c}" r="${r}" stroke="${s.color}" stroke-width="${s.weight}" fill="${s.fillColor}" fill-opacity="${s.fillOpacity}"${s.dashArray ? ` stroke-dasharray="${s.dashArray}"` : ''}/></svg>`;
+}
 const pointOf = p => typeof p === 'string' ? place(p)?.at : p;
 const sorensonOn = () => state.lens === 'sorenson';
 
@@ -108,8 +115,10 @@ function buildStaticUi() {
     selectChapter(book.chapters[Number(e.target.value) - 1]);
   });
   $('#scriptureAttribution').textContent = `${scripture.translation || 'The Book of Mormon'} · ${scripture.copyright || 'Public-domain text file'}`;
-  $('#layerOptions').innerHTML = [['places', 'Places', 'place'], ['guesses', 'Rough guesses', 'guess'], ['zones', 'Terrain zones', 'region'], ['paths', 'Paths', 'route'], ['distances', 'Sorenson’s distances', 'distance']]
-    .map(([key, label, kind]) => `<label class="layer-option"><input type="checkbox" data-layer="${key}"><span class="layer-swatch ${kind}"></span>${label}</label>`).join('');
+  // Place layers show the same dots the map draws: large for this chapter, small for other places.
+  const placeIcon = conf => `<span class="layer-swatch place-dots" title="Large blue dot: named in this chapter. Small dot: another place.">${placeDotSvg(conf, true)}${placeDotSvg(conf, false)}</span>`;
+  $('#layerOptions').innerHTML = [['places', 'Places', placeIcon('text'), '<small class="layer-hint" id="placesHint"></small>'], ['guesses', 'Rough guesses', placeIcon('guess')], ['zones', 'Terrain zones', '<span class="layer-swatch region"></span>'], ['paths', 'Paths', '<span class="layer-swatch route"></span>'], ['distances', 'Sorenson’s distances', '<span class="layer-swatch distance"></span>']]
+    .map(([key, label, icon, hint = '']) => `<label class="layer-option"><input type="checkbox" data-layer="${key}">${icon}<span>${label}${hint}</span></label>`).join('');
   // A book in the crumb list opens in this reader.
   $('#bookCrumb').addEventListener('click', e => {
     const link = e.target.closest('.crumb-menu a');
@@ -603,10 +612,11 @@ function drawOverlays() {
   if (state.layers.places) for (const p of data.places) {
     if (p.conf === 'guess' && !state.layers.guesses && !focus.has(p.id)) continue;
     const on = focus.has(p.id);
-    const marker = feature(`place:${p.id}`, () => L.circleMarker(ll(p.at), { pane: 'places', radius: 4, fillOpacity: p.conf === 'guess' ? .35 : 1, dashArray: p.conf === 'guess' ? '2 3' : null, className: `place-dot conf-${p.conf}` }), p, 'place');
+    const style = placeDotStyle(p.conf, on);
+    const marker = feature(`place:${p.id}`, () => L.circleMarker(ll(p.at), { pane: 'places', ...style, className: `place-dot conf-${p.conf}` }), p, 'place');
     marker._placeId = p.id;
-    marker.setRadius(on ? 6.5 : 4);
-    marker.setStyle({ color: on ? '#fff4dc' : '#c9d6cf', weight: on ? 2.5 : 1.25, fillColor: on ? '#0877c4' : '#3b4a3a' });
+    marker.setRadius(style.radius);
+    marker.setStyle(style);
   }
   retireMapFeatures(mapFeatures, wanted);
   drawArrows();
@@ -691,8 +701,8 @@ function layoutLabels() {
 function renderLegend() {
   const kinds = [...new Set(activeRoutes().map(r => r.kind))];
   const cm = chapterMap();
-  const confKey = cm?.oldWorld ? '<span><i class="dot text"></i>Known or proposed site</span>' : '<span><i class="dot text"></i>Text gives relations</span>';
-  $('.map-note').innerHTML = `<div class="movement-legend">${(state.layers.paths || guideOverlay) ? kinds.map(k => `<span><i style="background:${movementStyles[k].color}"></i>${movementStyles[k].label}</span>`).join('') : ''}${cm?.impacts?.length ? '<span><i class="impact-key"></i>Destroyed city</span>' : ''}</div>${mapContextHtml(cm)}<div class="conf-key">${confKey}<span><i class="dot guess"></i>Rough guess</span></div>`;
+  $('#placesHint').textContent = cm?.oldWorld ? 'Known or proposed site' : 'Text gives relations';
+  $('.map-note').innerHTML = `<div class="movement-legend">${(state.layers.paths || guideOverlay) ? kinds.map(k => `<span><i style="background:${movementStyles[k].color}"></i>${movementStyles[k].label}</span>`).join('') : ''}${cm?.impacts?.length ? '<span><i class="impact-key"></i>Destroyed city</span>' : ''}</div>${mapContextHtml(cm)}`;
 }
 function syncSelection() {
   const key = $('#contextCard').classList.contains('hidden') ? '' : $('#contextCard').dataset.feature;
