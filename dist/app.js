@@ -3,15 +3,15 @@
 // 1 Nephi 1–17 uses a second stage on the same grid: real land from Jerusalem to Arabia, far east of Mormon's map.
 import { initModalDragging } from './modal-drag.js?v=20261013.4';
 import { initChapterPicker } from './chapter-picker.js?v=20261013.4';
-import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261013.4';
+import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261016.1';
 import { initBookCrumb } from './breadcrumbs.js?v=20261013.1';
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const releaseVersion = '20261014.1';
 const storeKey = 'bom-wayfinder-state';
-const defaults = { chapter: 'alma-22', verse: 27, lens: 'sorenson', studyMode: 'read', layers: { places: true, zones: false, paths: true, distances: false, guesses: true }, map: null };
+const defaults = { chapter: 'alma-22', verse: 27, studyMode: 'read', layers: { places: true, zones: false, paths: true, distances: false, guesses: true }, map: null };
 let saved = readSaved();
-// Study mode and lens are shared with the book directory, like Bible Wayfinder's menu.
+// Study mode is shared with the book directory, like Bible Wayfinder's menu.
 let state = { ...defaults, ...saved, ...readPreferences(), layers: { ...defaults.layers, ...(saved.layers || {}) } };
 let data = { sources: [], chapterMaps: [], guides: [], places: [], areas: [], people: [], routes: [], distances: [], figures: [], geography: {} };
 let scripture = { books: [], chapters: {} };
@@ -42,15 +42,14 @@ function persist() {
     const view = map ? { center: [map.getCenter().lat, map.getCenter().lng], zoom: map.getZoom() } : state.map;
     localStorage.setItem(storeKey, JSON.stringify({ ...state, map: view }));
   } catch {}
-  savePreferences({ studyMode: state.studyMode, lens: state.lens });
-  const p = new URLSearchParams({ chapter: state.chapter, verse: state.verse, study: state.studyMode, lens: state.lens });
+  savePreferences({ studyMode: state.studyMode });
+  const p = new URLSearchParams({ chapter: state.chapter, verse: state.verse, study: state.studyMode });
   history.replaceState(null, '', `#${p}`);
 }
 function parseUrl() {
   const p = new URLSearchParams(location.hash.slice(1));
   if (p.get('chapter')) state.chapter = p.get('chapter');
   if (Number(p.get('verse'))) state.verse = Number(p.get('verse'));
-  if (['text', 'sorenson'].includes(p.get('lens'))) state.lens = p.get('lens');
   if (['read', 'map'].includes(p.get('study'))) state.studyMode = p.get('study');
   // The directory opens a book with ?book=<id>. Start at its first chapter.
   const bookParam = new URLSearchParams(location.search).get('book');
@@ -65,7 +64,6 @@ const chapterInfo = (id = state.chapter) => scripture.chapters[id];
 const chapterMap = (id = state.chapter) => data.chapterMaps.find(c => c.chapter === id);
 const ll = ([x, y]) => [y, x];
 const pointOf = p => typeof p === 'string' ? place(p)?.at : p;
-const sorensonOn = () => state.lens === 'sorenson';
 
 function refTarget(ref) {
   const m = ref.match(/^(.+?) (\d+):(\d+)/);
@@ -92,7 +90,6 @@ async function load() {
   chapterIds = scripture.books.flatMap(b => b.chapters);
   if (!chapterIds.includes(state.chapter)) state.chapter = defaults.chapter;
   if (!chapterInfo()?.verses.some(v => v.verse === state.verse)) state.verse = 1;
-  if (!['text', 'sorenson'].includes(state.lens)) state.lens = 'sorenson';
   if (!['read', 'map'].includes(state.studyMode)) state.studyMode = 'read';
   buildStaticUi(); initMap(); renderAll(true);
   if (results.slice(0, 2).some(r => r.status === 'rejected')) showToast('Some study files did not load. Reload the page and try again.');
@@ -161,8 +158,6 @@ function onClick(e) {
   if (ref) { goToVerse(ref.dataset.refChapter, Number(ref.dataset.refVerse)); return; }
   const mode = e.target.closest('[data-study-mode]');
   if (mode) { selectStudyMode(mode.dataset.studyMode); return; }
-  const lens = e.target.closest('[data-lens]');
-  if (lens) { state.lens = lens.dataset.lens; renderAll(); persist(); return; }
   const personLink = e.target.closest('[data-person-id]');
   if (personLink) { const p = person(personLink.dataset.personId); if (p) openFeature(p, 'person', personLink); return; }
   const placeLink = e.target.closest('[data-place-id]');
@@ -195,9 +190,7 @@ function performAction(action, id) {
 
 function renderAll(first = false) {
   renderView();
-  $$('[data-lens]').forEach(b => { const on = b.dataset.lens === state.lens; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
   $$('[data-layer]').forEach(i => { i.checked = !!state.layers[i.dataset.layer]; });
-  $('[data-layer="distances"]').closest('label').hidden = !sorensonOn();
   renderScripture();
   drawOverlays();
   if (first) { focusChapterMap(false); setTimeout(() => focusChapterMap(false), 250); }
@@ -361,17 +354,17 @@ function verseQuote(chapter, verse) {
   return `<figure class="study-quotation scripture-excerpt"><blockquote>${esc(v.text)}</blockquote><figcaption>${refButton(`${scripture.chapters[chapter].label}:${verse}`)} · The Book of Mormon</figcaption></figure>`;
 }
 function sorensonHtml(s) {
-  if (!sorensonOn() || !s) return '';
+  if (!s) return '';
   return `<div class="word-section"><h3>Sorenson’s reading</h3><p>${esc(s.text)} ${sorensonCite(s.pages)}</p></div>`;
 }
 // Old World places and paths cite the researcher who proposed them.
 function researchHtml(r, title) {
-  if (!sorensonOn() || !r) return '';
+  if (!r) return '';
   const s = source(r.sourceId);
   const cite = s ? ` <a class="source-inline-citation" href="${esc(s.url)}" data-source-id="${esc(s.id)}" aria-haspopup="dialog">${esc(s.author)}, ${s.year}</a>` : '';
   return `<div class="word-section"><h3>${title}</h3><p>${esc(r.text)}${cite}</p></div>`;
 }
-const cardSources = item => !sorensonOn() ? ['bom-text'] : item.stage === 'old' ? ['bom-text', item.research?.sourceId].filter(Boolean) : ['bom-text', 'sorenson-2000'];
+const cardSources = item => item.stage === 'old' ? ['bom-text', item.research?.sourceId].filter(Boolean) : ['bom-text', 'sorenson-2000'];
 function placeCardHtml(p) {
   const cm = chapterMap();
   const verses = cm?.placeMentions?.[p.id] || [];
@@ -390,7 +383,7 @@ function distanceCardHtml(d) {
   return `<span class="eyebrow">Sorenson’s distance</span><h2>${esc(d.label)}</h2><div class="feature-prose"><p>${esc(d.text)} ${sorensonCite(d.pages)}</p></div>${sourcesHtml(['sorenson-2000'])}<p class="card-footnote">Sorenson says his miles could be off by about a quarter.</p>`;
 }
 function terrainCardHtml(t) {
-  return `<span class="eyebrow">${t.level === 'mountain' ? 'Mountains or rugged wilderness' : 'Higher land'}</span><h2>${esc(t.name)}</h2><div class="feature-prose"><p>${esc(t.summary)}</p><p>${t.refs.map(refButton).join(' · ')}</p></div>${sorensonOn() ? `<div class="word-section sorenson-section"><h3>Sorenson’s reading</h3><p>${esc(t.sorenson)} ${sorensonCite(t.pages)}</p></div>` : ''}${sourcesHtml(sorensonOn() ? ['bom-text', 'sorenson-2000'] : ['bom-text'])}<p class="card-footnote">The text says “up” and “down.” It never gives heights.</p>`;
+  return `<span class="eyebrow">${t.level === 'mountain' ? 'Mountains or rugged wilderness' : 'Higher land'}</span><h2>${esc(t.name)}</h2><div class="feature-prose"><p>${esc(t.summary)}</p><p>${t.refs.map(refButton).join(' · ')}</p></div><div class="word-section sorenson-section"><h3>Sorenson’s reading</h3><p>${esc(t.sorenson)} ${sorensonCite(t.pages)}</p></div>${sourcesHtml(['bom-text', 'sorenson-2000'])}<p class="card-footnote">The text says “up” and “down.” It never gives heights.</p>`;
 }
 function impactCardHtml(p) {
   return `<span class="eyebrow">Destruction / distress</span><h2>${esc(p.name)}</h2><div class="feature-prose"><p>${esc(p.impact.text)} ${refButton(p.impact.ref)}</p>${verseQuote(state.chapter, refTarget(p.impact.ref).verse)}</div>${sourcesHtml(['bom-text'])}`;
@@ -507,7 +500,6 @@ function activeRoutes() {
   return data.routes.filter(r => ids.has(r.id));
 }
 function activeDistances() {
-  if (!sorensonOn()) return [];
   if (guideOverlay?.distanceIds.length) return data.distances.filter(d => guideOverlay.distanceIds.includes(d.id) || state.layers.distances);
   return state.layers.distances ? data.distances : [];
 }
@@ -772,8 +764,8 @@ function applyGuideStep() {
 function renderGuideStep() {
   const guide = data.guides.find(g => g.id === guideState?.id), step = guide?.steps[guideState.index];
   if (!step) { guideState = null; return renderGuides(); }
-  const page = step.page && sorensonOn() ? `<p class="muted">Sorenson’s map ${guideState.index + 1} is on ${sorensonCite(String(step.page))}.</p>` : '';
-  const text = !sorensonOn() && guide.id === 'sorenson-maps' ? '<p class="muted">Select Text + Sorenson in Menu to read his explanation for this map.</p>' : `<p>${esc(step.text)}</p>`;
+  const page = step.page ? `<p class="muted">Sorenson’s map ${guideState.index + 1} is on ${sorensonCite(String(step.page))}.</p>` : '';
+  const text = `<p>${esc(step.text)}</p>`;
   $('#tourDrawer').innerHTML = `<button class="dialog-close" data-action="close-guides" aria-label="Close guide">×</button><button class="back-button guide-back" data-action="guide-list">← Back to guide list</button><p class="tour-progress">${esc(guide.title)} · Step ${guideState.index + 1} of ${guide.steps.length}</p><h2>${esc(step.title)}</h2>${text}${page}${verseQuote(step.chapter, step.verse)}<p class="place-chips">${step.placeIds.map(id => `<button type="button" class="place-chip" data-place-id="${esc(id)}">${esc(place(id)?.name)}</button>`).join('')}</p><div class="tour-nav"><button data-action="guide-prev" ${guideState.index === 0 ? 'disabled' : ''}>← Previous</button><button data-action="guide-next">${guideState.index === guide.steps.length - 1 ? 'Finish' : 'Next →'}</button></div>`;
   $('#tourDrawer').scrollTop = 0;
 }
