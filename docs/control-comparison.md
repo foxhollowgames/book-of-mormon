@@ -32,7 +32,7 @@ This lists each control family, including controls made from data.
 | Layers | No Map context disclosure | Map context disclosure | Add; move place and area lists here |
 | Layers | No roads or nations | Only shows layers supported by book data | Do not add empty controls |
 | Layers | No gray coverage key | Gray areas outside real-map coverage | Omit; the relative map has no real-world coverage mask |
-| Sidebar | Previous and Next | Previous and Next within one book | Keep; stop at book boundaries |
+| Sidebar | Previous and Next | Previous and Next across books | Continue into the next or previous book |
 | Sidebar | Chapter picker and numbered options | Same picker and options | Keep |
 | Sidebar | Scripture resize separator | Same mouse and keyboard resize | Keep |
 | Sidebar | Places named here chips | Entity details and map context | Move chips to layer Map context |

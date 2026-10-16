@@ -64,7 +64,7 @@ npm run check
 
 **Read** shows the scripture beside the map. **Map** gives the whole screen to the map. **Recenter** appears at the top of the map after you move or zoom it.
 Map mode has a chapter-order slider, as in Bible Wayfinder's undated books.
-Previous and Next stay within the selected book. Use the back arrow to choose another book.
+Previous and Next continue across books. Next on the last chapter of a book opens chapter 1 of the next book. Previous on chapter 1 opens the last chapter of the previous book.
 The extra **Show the whole land** button was removed. Zoom out to see the whole land.
 
 Sorenson's reasoning, page references, figures, and distances always show. There is no separate study lens.
