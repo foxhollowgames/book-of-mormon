@@ -1,10 +1,10 @@
 // Book of Mormon Wayfinder. Built on the Isaiah Study Guide app shell.
 // The map uses Leaflet's flat CRS. One map unit is one of Sorenson's estimated miles.
 // 1 Nephi 1–17 uses a second stage on the same grid: real land from Jerusalem to Arabia, far east of Mormon's map.
-import { initModalDragging } from './modal-drag.js?v=20261016.2';
-import { initChapterPicker } from './chapter-picker.js?v=20261016.2';
-import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261016.2';
-import { initBookCrumb } from './breadcrumbs.js?v=20261016.2';
+import { initModalDragging } from './modal-drag.js?v=20261018.1';
+import { initChapterPicker } from './chapter-picker.js?v=20261018.1';
+import { initMenu, readPreferences, savePreferences } from './settings-menu.js?v=20261018.1';
+import { initBookCrumb } from './breadcrumbs.js?v=20261018.1';
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const releaseVersion = '20261014.1';
@@ -13,6 +13,15 @@ const defaults = { chapter: 'alma-22', verse: 27, studyMode: 'read', layers: { p
 let saved = readSaved();
 // Study mode is shared with the book directory, like Bible Wayfinder's menu.
 let state = { ...defaults, ...saved, ...readPreferences(), layers: { ...defaults.layers, ...(saved.layers || {}) } };
+// The timeline lists the chapters it has an event for. Those chapters get a "See on timeline" link under the heading.
+// A chapter id such as alma-22 is also its timeline event id. When the list does not load, as on a local server, no link shows.
+let timelineIds = null;
+fetch('../timeline/data/chapters.json').then(r => r.ok ? r.json() : null).then(list => {
+  if (!Array.isArray(list?.events)) return;
+  timelineIds = new Set(list.events);
+  const block = document.querySelector('.chapter-picker-block');
+  if (block && !block.querySelector('.chapter-timeline-link')) block.insertAdjacentHTML('beforeend', timelineLinkHtml());
+}).catch(() => {});
 let data = { sources: [], chapterMaps: [], guides: [], places: [], areas: [], people: [], routes: [], distances: [], figures: [], geography: {} };
 let scripture = { books: [], chapters: {} };
 // Chapters with a path or a place of loss on the map. The scrubber and the event buttons step through these across every book.
@@ -290,8 +299,11 @@ function mapContextHtml(cm) {
   const chips = named.length ? `<p class="place-chips">${named.map(p => `<button type="button" class="place-chip conf-${p.conf}" data-place-id="${esc(p.id)}">${esc(p.name)}</button>`).join('')}</p>` : '';
   return `${empty}<details><summary>Map context</summary><p>${scope}</p>${chips}${areas.length ? `<p>${areas.map(a => esc(a.name)).join(' · ')}</p>` : ''}</details>`;
 }
+function timelineLinkHtml() {
+  return timelineIds?.has(state.chapter) ? `<a class="chapter-timeline-link" href="../timeline/#event=${encodeURIComponent(state.chapter)}">See on timeline</a>` : '';
+}
 function chapterDateHtml(cm) {
-  return cm?.dateLabel ? `<p class="chapter-date" aria-label="Approximate date: ${esc(cm.dateLabel)}">${esc(cm.dateLabel)}</p>` : '';
+  return (cm?.dateLabel ? `<p class="chapter-date" aria-label="Approximate date: ${esc(cm.dateLabel)}">${esc(cm.dateLabel)}</p>` : '') + timelineLinkHtml();
 }
 function renderScripture() {
   const info = chapterInfo(), cm = chapterMap();

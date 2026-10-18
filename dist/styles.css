@@ -168,7 +168,7 @@ path.map-feature.campaign-hit:hover,path.map-feature.campaign-hit:focus-visible{
 #railChapters{min-height:0;overflow-y:auto;flex:1;width:100%;scrollbar-width:thin;scrollbar-color:#276181 transparent}
 .rail{overflow:hidden}.rail-footer{flex-shrink:0}
 .scripture-heading .chapter-picker{min-width:0;max-width:100%;margin:0;color:var(--ink)}
-.chapter-picker-block{min-width:0;width:max-content;max-width:100%;text-align:center}.chapter-picker-block .chapter-picker{width:auto}.chapter-date{margin:4px 0 0;color:#b8d4e3;font:12px/1.25 var(--sans)}
+.chapter-picker-block{min-width:0;width:max-content;max-width:100%;text-align:center}.chapter-picker-block .chapter-picker{width:auto}.chapter-date{margin:4px 0 0;color:#b8d4e3;font:12px/1.25 var(--sans)}.chapter-timeline-link{display:inline-block;margin:4px 0 0;color:#92e5ff;font:12px/1.25 var(--sans);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
 .sidebar-content{padding-top:0}
 .scripture-heading{position:sticky;top:0;z-index:4;margin-top:0;padding:8px 0;background:#041d34;box-shadow:0 8px 14px #021323b8}
 .scripture-resize{border-inline-end:0}
