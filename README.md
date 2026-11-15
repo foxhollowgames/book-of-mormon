@@ -136,3 +136,7 @@ Impact rings had clicks disabled. Terrain lacked keyboard setup when first added
 The shared CSS and helper files were compared with Bible Wayfinder `main` at `48f5a45`.
 That checkout has no `directory.css`. This app keeps only its map-cover additions there.
 See [the control comparison](docs/control-comparison.md) for the full control inventory.
+
+## Optional analytics
+
+The consent-gated analytics source is in the hub repository at viewer/analytics.js. Run npm run sync-analytics there to update all copies. Keep the loader in each HTML page. Analytics choices lets visitors accept, decline, or withdraw. Only broad site sections are reported, not chapter or search state. See the hub README for privacy settings and verification instructions.
